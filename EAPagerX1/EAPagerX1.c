@@ -18,26 +18,123 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
-#include <C:/Program Files (x86)/Atmel/Atmel Toolchain/AVR8 GCC/Native/3.4.1056/avr8-gnu-toolchain/avr/include/avr/pgmspace.h>
+#include <avr/pgmspace.h>
+//#include <C:/Program Files (x86)/Atmel/Atmel Toolchain/AVR8 GCC/Native/3.4.1056/avr8-gnu-toolchain/avr/include/avr/pgmspace.h>
 #include <avr/interrupt.h>
 #include "EAimages.h"
+#include "MazeGame.h"
 #include "EAPagerX1.h"
-
 
 volatile unsigned int adcValue = 0;
 volatile unsigned int xTouch=0, yTouch=0;
 unsigned int debug, debug1;
+const unsigned char LUT_RED_INC = 8;
+const unsigned char LUT_GREEN_INC = 4;
+const unsigned char LUT_BLUE_INC = 8;
+
 
 int main(void)
 {
+	clock_init();
+	//playMazeGame();
+	PORTF_DIRSET = 0x40;	// Enable LED port
 	
+	tft_init();
 	touchInit();
+	tft_print_image(0, 0xFBE0);
     while(1)
     {
-		measureTouchCoordinates();
-		debug=0;
-	   
+		//measureTouchCoordinates();
+		debug1Function();
+	
+		
+		
+/*		tft_print_square(100, 100, 0xFFFF, 100);
+		_delay_ms(1000);
+		tft_print_square(100, 100, 0x001F, 100);
+		_delay_ms(1000);
+*/
+
     }
+
+}
+
+void tft_print_square(unsigned int xCoord, unsigned int yCoord, unsigned int color, unsigned char size) {
+	unsigned int expandedXCoord = 2*xCoord;
+	unsigned int expandedYCoord	= 2*yCoord;
+	unsigned char endOffset = size-1;
+	setWindow(expandedXCoord, expandedXCoord+endOffset, expandedYCoord, expandedYCoord+endOffset);
+	tft_write_command(0x2C);	//Begin RAMWR
+	unsigned int area = size*size;
+	for (int i=0; i < area; i++) {
+		tft_write_data16(color);
+	}
+	//tft_write_command(0x00);
+}
+
+void tft_print_image(unsigned char imageId, unsigned int color) {
+	setWindow(0, 799, 0, 479);
+	tft_write_command(0x2C);	//Begin RAMWR
+	for (int y=0; y<240; y++) {
+		for (int x=0; x<400; x++) {
+			if (getPixel(0,x,y)) {
+				tft_write_data16(color);
+				tft_write_data16(color);
+			}
+			else {
+				tft_write_data16(0x0000);
+				tft_write_data16(0x0000);
+			}
+		}
+		
+		for (int x=0; x<400; x++) {
+			if (getPixel(0,x,y)) {
+				tft_write_data16(color);
+				tft_write_data16(color);
+			}
+			else {
+				tft_write_data16(0x0000);
+				tft_write_data16(0x0000);
+			}
+		}
+	}
+	tft_write_command(0x00);
+}
+
+void alternateColors() {
+		   		setWindow(0, 799, 0, 479);
+		   		tft_write_command(0x2C);	//Begin RAMWR
+		   		for (int y=0; y < 800; y++) {
+			   		for (int x=0; x<480; x++) {
+//				   		tft_write_data16(0xFF00);
+//				   		tft_write_data16(0x00FF);
+//				   		tft_write_data16(0x0000);
+//				   		tft_write_data16(0xFFFF);
+//						tft_write_data16(0xFFFF);
+						tft_write_data16(0xFFFF);
+				   		//tft_write_data16(0x0000);
+			   		}
+			   		//colorChar++;
+			   		//colorInt++;
+		   		}
+		   		tft_write_command(0x00);
+		   		
+		   		tft_write_command(0x2C);	//Begin RAMWR
+		   		for (int y=0; y < 800; y++) {
+			   		for (int x=0; x<480; x++) {
+				   		//tft_write_data8(colorChar);
+//				   		tft_write_data16(0x00FF);
+//				   		tft_write_data16(0x0000);
+				   		tft_write_data16(0xFF00);
+				   		//tft_write_data16(0xFFFF);
+				   		//tft_write_data16(0x0000);
+						//tft_write_data16(0x0000);
+						//tft_write_data16(0x0000);
+			   		}
+			   		//colorChar++;
+			   		//colorInt++;
+		   		}
+		   		tft_write_command(0x00);
 }
 
 void measureTouchCoordinates() {
@@ -54,6 +151,7 @@ void measureTouchCoordinates() {
 		debug=0;
 	}
 	xTouch = ADCA_CH0_RES;	// Read ADC value
+	ADCA_INTFLAGS = 0x01;	// Clear ready flag
 	// ------------------------------------------
 	// Checking Y coordinate --------------------
 	PORTA_DIRSET = 0x0A;	// Set YU and YD as outputs
@@ -65,9 +163,10 @@ void measureTouchCoordinates() {
 		debug=0;
 	}
 	yTouch = ADCA_CH0_RES;	// Read ADC value
+	ADCA_INTFLAGS = 0x01;	// Clear ready flag
 	// ------------------------------------------
 	sei();	// Enable Interrupts
-	touchSenseInit();	// Setup pins to sense a touch
+	//touchSenseInit();	// Setup pins to sense a touch
 }
 
 void touchInit() {
@@ -76,23 +175,61 @@ void touchInit() {
 }
 
 void touchSenseInit() {
+		
+		//PORTA_PIN0CTRL |= 0x18;	// Pullup resistor on AREF
 		PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
 		PORTA_DIRSET = 0x08;	// Set YD as output
 		PORTA_OUTCLR = 0x08;	// Set YD low
-		PORTA_PIN4CTRL |= 0x1B;	//Set XR with pullup resistor and sense low level
+		PORTA_PIN4CTRL |= 0x03;	// XR sense low level
+		//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
+		PORTF_DIRSET = 0x80;	// Set F7 as output
+		PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR		
 		
 		// Enable interrupt on XR change (PORTA_INT0) ----
+		PORTA_INTFLAGS &= 0xFE;	// Clear PORTA Int0 Int Flag
 		sei();
-		PMIC_CTRL |= 0x02;	// Enable Medium level interrupts in PMIC
-		PORTA_INTCTRL |= 0x20;
-		PORTA_INTCTRL &= 0xFE;	// Enable INT0 at medium priority
-		PORTA_INT0MASK |= 0x10;	// PA4 will trigger INT0
+		PMIC_CTRL |= 0x04;	// Enable High level interrupts in PMIC
+		PORTA_INTCTRL = 0x03;	// Enable INT0 at high priority
+		PORTA_INT0MASK |= 0x10;	// PA4 (XR) will trigger INT0
 		//--------------------------------------------
+		
+		// Route Event from PORTA to Timer?
+		
+//		PORTF_INTCTRL = 0x03;	// Enable INT0 at high priority
+//		PORTF_INT0MASK |= 0x01;	// F0 will trigger interrupt
+		
+//		PORTF_DIRSET = 0x01;	// Set F0 as output
+//		PORTF_OUTSET = 0x01;	// Set F0 high
+//		EVSYS_CH2MUX = 0x78;	// PORTF pin0 is event ch2 source
+		//EVSYS_CH1MUX = 0x58;	// PORTA pin4 is event ch1 source
+		
+		
+		// Setup Timer1 for Debouncing
+		TCC1_CTRLB = 0x00;	// Normal counting mode
+		//TCC1_CTRLD = 0x49;	// Will start ext. ctrld up/down count on event from ch1
+		TCC1_INTCTRLB = 0x0C;	// CCB interupt enabled at high priority
+		TCC1_PER = 7813;	// Top = 7813
+		TCC1_CCB = 7813;	// CCB = 7813	// Interrupt will occur at .25 s
+		
+		
 }
 
 // When Touch detected
 ISR(PORTA_INT0_vect) {
+	//EVSYS_DATA |= 0x06;
+	//EVSYS_STROBE |= 0x06;	// Trigger Event Ch1 and Ch2 to start debounce counter
+	PORTF_OUTTGL = 0x40;	// Toggle LED
+	TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
+	PORTF_OUTCLR = 0x80;	// Disable ext pull up on XR
 	measureTouchCoordinates();
+	tft_print_square(100, 100, 0xFFFF, 10);
+}
+
+// After Debouncing period, detect touches again
+ISR(TCC1_CCB_vect) {
+	TCC1_CTRLA = 0x00;	// Stop timer
+	TCC1_CTRLFSET = 0x08;	//Restart timer
+	touchSenseInit();
 }
 
 void adc_take_sample(char axis) {
@@ -108,8 +245,8 @@ void adc_take_sample(char axis) {
 
 void adc_enable() {
 	ADCA_CTRLA |= ADC_ENABLE_bm;  // enable ADCA
-	ADCA_REFCTRL |= ADC_REFSEL_AREFA_gc;	// Use AREFA as reference
-	ADCA_PRESCALER |= ADC_PRESCALER_DIV32_gc;	// Set ADC Clk to 1 MHz
+	ADCA_REFCTRL |= ADC_REFSEL_AREFA_gc;	// Use AREFA = 2.67 V as reference
+	ADCA_PRESCALER |= ADC_PRESCALER_DIV64_gc;	// Set ADC Clk to 0.5 MHz
 	ADCA_CH0_CTRL |= ADC_CH_INPUTMODE0_bm;	// Set as Single ended positive input signal
 }
 
@@ -142,6 +279,21 @@ void tft_write_data16(unsigned int data) {
 	PORTA_OUTSET = TFTWR;	// Lock in data
 	//PORTA |= TFTCS_H;
 	//debug=0;
+}
+
+void setWindow(unsigned int xStart, unsigned int xEnd, unsigned int yStart, unsigned int yEnd) {
+	tft_write_command(0x2A);				//Set column address
+	tft_write_data8((char)(xStart >>8));	//Set Column Start
+	tft_write_data8((char)xStart);
+	tft_write_data8((char)(xEnd >> 8));		//Set column end
+	tft_write_data8((char)xEnd);
+	
+	tft_write_command(0x2B);				//Set Page (Row) Address
+	tft_write_data8((char)(yStart >>8));	//Set Page (Row) Start
+	tft_write_data8((char)yStart);
+	tft_write_data8((char)(yEnd >> 8));		//Set Page (Row) end
+	tft_write_data8((char)yEnd);
+	
 }
 
 void tft_init() {
@@ -277,15 +429,37 @@ void tft_init() {
 	tft_write_data8(0x14);
 	tft_write_data8(0x13);
 	tft_write_data8(0x19);
+
+///////////////// // Define LUT for 16 bit mode ///////////////////////	
+	volatile unsigned char LUTValue = 0x00;
+	tft_write_command(0x2D);		// Define LUT for 16 bit mode
+	
+	for (int i=0; i < 64; i++) {	// Define Red section
+		tft_write_data8(LUTValue);
+		LUTValue += LUT_RED_INC;
+	}
+	
+	LUTValue = 0x00;				// Define Green Section
+	for (int i=0; i < 64; i++) {	
+		tft_write_data8(LUTValue);
+		LUTValue += LUT_GREEN_INC;
+	}
+	
+	LUTValue = 0x00;				// Define Green Section
+	for (int i=0; i < 64; i++) {
+		tft_write_data8(LUTValue);
+		LUTValue += LUT_BLUE_INC;
+	}
+///////////////////////////////////////////////////////////////////	
 	
 	tft_write_command(0x3A);	//Interface pixel format
-	tft_write_data8(0x77);		//3 bytes per pixel
+	tft_write_data8(0x55);		//2 bytes per pixel
 	
 	//tft_write_command(0x3A);	//COLMOD
 	//tft_write_data8(0x77);
 	
 	tft_write_command(0x36);	//MADCTL
-	tft_write_data8(0x80);
+	tft_write_data8(0xA0);
 	
 	tft_write_command(0x11);	//SLPOUT
 	_delay_ms(120);
@@ -294,6 +468,23 @@ void tft_init() {
 	_delay_ms(10);
 }
 
-void tft_print_image(unsigned char *imageArray) {
-	
+void debug1Function() {
+	debug1=1;
+	debug1=0;
+}
+
+void clock_init() {
+	PORTD_DIRSET = 0x80;		// Set PORTD7 as output
+	PORTCFG_CLKEVOUT = 0x02;	// Output per clock to PortD pin 7
+	OSC_CTRL |= OSC_RC32MEN_bm;	// Enable 32 MHz internal Osc
+//	OSC_CTRL |= OSC_RC32KEN_bm;	// Enable 32.768 kHz internal Oscillator
+	while (!(OSC_STATUS & OSC_RC32MRDY_bm)) {	// Wait till new clock ready
+		debug=3;
+	}
+	CCP = 0xD8; // Enable writing to protected IO Reg
+	CLK_CTRL = 0x01;	// Use 32 MHz internal Osc as system clk
+/*	DFLLRC32M_CTRL = 0x01;	// enable DFLL
+	DFLLRC32M_COMP1 = 0xFE;
+	DFLLRC32M_COMP2 = 0xCD;	// Set Oscillator Output to 54 MHz
+*/
 }
