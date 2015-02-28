@@ -12,6 +12,20 @@
 #define TFTWR ((char)0x20)
 // -------------------------------
 
+// 16 bit Color Definitions ------
+#define TFT_RED 0xF800
+#define TFT_GREEN 0x07E0
+#define TFT_BLUE 0x001F
+#define TFT_ORANGE 0xFBE0
+// -------------------------------
+
+#define ADC_X_OFFSET 3250
+#define X_COORD_MAX 400
+#define ADC_X_MAX_MAG (4096-ADC_X_OFFSET)
+#define ADC_Y_OFFSET 1000
+#define Y_COORD_MAX 240
+#define ADC_Y_MAX_MAG (3400-ADC_Y_OFFSET)
+
 #define XAXIS ((char)0)
 #define YAXIS ((char)1)
 #define F_CPU 32000000
@@ -27,7 +41,18 @@
 
 volatile unsigned int adcValue = 0;
 volatile unsigned int xTouch=0, yTouch=0;
+volatile unsigned long xTouchCoord, yTouchCoord;
 unsigned int debug, debug1;
+
+/*
+const unsigned int ADC_X_OFFSET = 3250;
+const unsigned int X_COORD_MAX = 400;
+unsigned int ADC_X_MAX_MAG = 4096-ADC_X_OFFSET;
+const unsigned int ADC_Y_OFFSET = 1000;
+const unsigned int Y_COORD_MAX = 240;
+unsigned int ADC_Y_MAX_MAG = 1460;
+*/
+
 const unsigned char LUT_RED_INC = 8;
 const unsigned char LUT_GREEN_INC = 4;
 const unsigned char LUT_BLUE_INC = 8;
@@ -37,11 +62,11 @@ int main(void)
 {
 	clock_init();
 	//playMazeGame();
-	PORTF_DIRSET = 0x40;	// Enable LED port
+	PORTF_DIRSET = 0x60;	// Enable LED port
 	
 	tft_init();
 	touchInit();
-	tft_print_image(0, 0xFBE0);
+	tft_print_image(0, TFT_ORANGE);
     while(1)
     {
 		//measureTouchCoordinates();
@@ -138,10 +163,7 @@ void alternateColors() {
 }
 
 void measureTouchCoordinates() {
-
-	PORTA_INTCTRL &= 0x00;	
-	cli();	//Disable Interrupts
-	// Checking X coordinate ---------------------
+	// Checking Y coordinate ---------------------
 	PORTA_DIRSET = 0x14;	// Set XL and XR as outputs
 	PORTA_DIRCLR = 0x0A;	// Set YU and YD as inputs
 	PORTA_OUTSET = 0x10;	// Set XR high
@@ -150,10 +172,10 @@ void measureTouchCoordinates() {
 	while (!(ADCA_INTFLAGS & (1 << 0))) {	//Wait for ADC to finish sampling
 		debug=0;
 	}
-	xTouch = ADCA_CH0_RES;	// Read ADC value
+	yTouch = ADCA_CH0_RES;	// Read ADC value
 	ADCA_INTFLAGS = 0x01;	// Clear ready flag
 	// ------------------------------------------
-	// Checking Y coordinate --------------------
+	// Checking X coordinate --------------------
 	PORTA_DIRSET = 0x0A;	// Set YU and YD as outputs
 	PORTA_DIRCLR = 0x14;	// set XL and XR as inputs
 	PORTA_OUTSET = 0x02;	// Set YU high
@@ -162,10 +184,10 @@ void measureTouchCoordinates() {
 	while (!(ADCA_INTFLAGS & (1 << 0))) {	//Wait for ADC to finish sampling
 		debug=0;
 	}
-	yTouch = ADCA_CH0_RES;	// Read ADC value
+	xTouch = ADCA_CH0_RES;	// Read ADC value
 	ADCA_INTFLAGS = 0x01;	// Clear ready flag
 	// ------------------------------------------
-	sei();	// Enable Interrupts
+	//sei();	// Enable Interrupts
 	//touchSenseInit();	// Setup pins to sense a touch
 }
 
@@ -174,62 +196,77 @@ void touchInit() {
 	touchSenseInit();
 }
 
-void touchSenseInit() {
+void touchSenseReset() {
+	//PORTA_PIN0CTRL |= 0x18;	// Pullup resistor on AREF
+	PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
+	PORTA_DIRSET = 0x08;	// Set YD as output
+	PORTA_OUTCLR = 0x08;	// Set YD low
+	PORTA_PIN4CTRL |= 0x03;	// XR sense low level
+	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
+	PORTF_DIRSET = 0x80;	// Set F7 as output
+	PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR
+	
+	// Enable interrupt on XR change (PORTA_INT0) ----
+	PORTA_INTFLAGS |= 0x01;	// Clear PORTA Int0 Int Flag
+	sei();
+	PORTA_INTCTRL = 0x03;	// Enable PORTA INT0 at high priority
+}
+
+void touchSenseInit() {	
+	
+	touchSenseReset();
 		
-		//PORTA_PIN0CTRL |= 0x18;	// Pullup resistor on AREF
-		PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
-		PORTA_DIRSET = 0x08;	// Set YD as output
-		PORTA_OUTCLR = 0x08;	// Set YD low
-		PORTA_PIN4CTRL |= 0x03;	// XR sense low level
-		//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
-		PORTF_DIRSET = 0x80;	// Set F7 as output
-		PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR		
+	PMIC_CTRL |= 0x04;	// Enable High level interrupts in PMIC
+	PORTA_INTCTRL = 0x03;	// Enable INT0 at high priority
+	PORTA_INT0MASK |= 0x10;	// PA4 (XR) will trigger INT0
+	//--------------------------------------------
 		
-		// Enable interrupt on XR change (PORTA_INT0) ----
-		PORTA_INTFLAGS &= 0xFE;	// Clear PORTA Int0 Int Flag
-		sei();
-		PMIC_CTRL |= 0x04;	// Enable High level interrupts in PMIC
-		PORTA_INTCTRL = 0x03;	// Enable INT0 at high priority
-		PORTA_INT0MASK |= 0x10;	// PA4 (XR) will trigger INT0
-		//--------------------------------------------
-		
-		// Route Event from PORTA to Timer?
-		
-//		PORTF_INTCTRL = 0x03;	// Enable INT0 at high priority
-//		PORTF_INT0MASK |= 0x01;	// F0 will trigger interrupt
-		
-//		PORTF_DIRSET = 0x01;	// Set F0 as output
-//		PORTF_OUTSET = 0x01;	// Set F0 high
-//		EVSYS_CH2MUX = 0x78;	// PORTF pin0 is event ch2 source
-		//EVSYS_CH1MUX = 0x58;	// PORTA pin4 is event ch1 source
-		
-		
-		// Setup Timer1 for Debouncing
-		TCC1_CTRLB = 0x00;	// Normal counting mode
-		//TCC1_CTRLD = 0x49;	// Will start ext. ctrld up/down count on event from ch1
-		TCC1_INTCTRLB = 0x0C;	// CCB interupt enabled at high priority
-		TCC1_PER = 7813;	// Top = 7813
-		TCC1_CCB = 7813;	// CCB = 7813	// Interrupt will occur at .25 s
+	// Route Event from PORTA to Timer?
+	
+//	PORTF_INTCTRL = 0x03;	// Enable INT0 at high priority
+//	PORTF_INT0MASK |= 0x01;	// F0 will trigger interrupt
+	
+//	PORTF_DIRSET = 0x01;	// Set F0 as output
+//	PORTF_OUTSET = 0x01;	// Set F0 high
+//	EVSYS_CH2MUX = 0x78;	// PORTF pin0 is event ch2 source
+	//EVSYS_CH1MUX = 0x58;	// PORTA pin4 is event ch1 source
 		
 		
+	// Setup Timer1 for Debouncing
+	TCC1_CTRLB = 0x00;	// Normal counting mode
+	//TCC1_CTRLD = 0x49;	// Will start ext. ctrld up/down count on event from ch1
+	TCC1_INTCTRLB = 0x0C;	// CCB interupt enabled at high priority
+	TCC1_PER = 7813;	// Top = 7813
+	TCC1_CCB = 7813;	// CCB = 7813	// Interrupt will occur at .25 s	
 }
 
 // When Touch detected
 ISR(PORTA_INT0_vect) {
 	//EVSYS_DATA |= 0x06;
 	//EVSYS_STROBE |= 0x06;	// Trigger Event Ch1 and Ch2 to start debounce counter
-	PORTF_OUTTGL = 0x40;	// Toggle LED
+	PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+	cli();
+	PORTF_OUTTGL = 0x40;	// Toggle Red LED
 	TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
 	PORTF_OUTCLR = 0x80;	// Disable ext pull up on XR
 	measureTouchCoordinates();
-	tft_print_square(100, 100, 0xFFFF, 10);
+	xTouchCoord = (volatile unsigned long)(xTouch & 0xFFF8);
+	xTouchCoord -= (volatile unsigned long)ADC_X_OFFSET;
+	xTouchCoord *= (volatile unsigned long)X_COORD_MAX;
+	xTouchCoord /= (volatile unsigned long)ADC_X_MAX_MAG;
+	yTouchCoord = (volatile unsigned long)(yTouch & 0xFFF8);
+	yTouchCoord -= (volatile unsigned long)ADC_Y_OFFSET;
+	yTouchCoord *= (volatile unsigned long)Y_COORD_MAX;
+	yTouchCoord /= (volatile unsigned long)ADC_Y_MAX_MAG;
+	tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 10);
 }
 
 // After Debouncing period, detect touches again
 ISR(TCC1_CCB_vect) {
+	PORTF_OUTTGL = 0x20;	// Toggle Blue LED
 	TCC1_CTRLA = 0x00;	// Stop timer
 	TCC1_CTRLFSET = 0x08;	//Restart timer
-	touchSenseInit();
+	touchSenseReset();
 }
 
 void adc_take_sample(char axis) {
