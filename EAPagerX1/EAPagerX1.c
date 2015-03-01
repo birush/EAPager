@@ -19,12 +19,12 @@
 #define TFT_ORANGE 0xFBE0
 // -------------------------------
 
-#define ADC_X_OFFSET 3250
+#define ADC_X_OFFSET 1700
 #define X_COORD_MAX 400
-#define ADC_X_MAX_MAG (4096-ADC_X_OFFSET)
-#define ADC_Y_OFFSET 1000
+#define ADC_X_MAX_MAG (4095-ADC_X_OFFSET)
+#define ADC_Y_OFFSET 1475
 #define Y_COORD_MAX 240
-#define ADC_Y_MAX_MAG (3400-ADC_Y_OFFSET)
+#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
 
 #define XAXIS ((char)0)
 #define YAXIS ((char)1)
@@ -62,7 +62,7 @@ int main(void)
 {
 	clock_init();
 	//playMazeGame();
-	PORTF_DIRSET = 0x60;	// Enable LED port
+	PORTF_DIRSET = 0x60;	// Enable LED ports
 	
 	tft_init();
 	touchInit();
@@ -201,9 +201,8 @@ void touchSenseReset() {
 	PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
 	PORTA_DIRSET = 0x08;	// Set YD as output
 	PORTA_OUTCLR = 0x08;	// Set YD low
-	PORTA_PIN4CTRL |= 0x03;	// XR sense low level
+	PORTA_PIN4CTRL |= 0x02;	// XR sense falling edge
 	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
-	PORTF_DIRSET = 0x80;	// Set F7 as output
 	PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR
 	
 	// Enable interrupt on XR change (PORTA_INT0) ----
@@ -213,15 +212,15 @@ void touchSenseReset() {
 }
 
 void touchSenseInit() {	
+	PORTF_DIRSET = 0x80;	// Set F7 as output
 	
 	touchSenseReset();
 		
 	PMIC_CTRL |= 0x04;	// Enable High level interrupts in PMIC
 	PORTA_INTCTRL = 0x03;	// Enable INT0 at high priority
-	PORTA_INT0MASK |= 0x10;	// PA4 (XR) will trigger INT0
-	//--------------------------------------------
-		
-	// Route Event from PORTA to Timer?
+	PORTA_INT0MASK |= 0x10;	// PA4 (XR) will trigger PORTA INT0
+
+// --------Route Event from PORTA to Timer?
 	
 //	PORTF_INTCTRL = 0x03;	// Enable INT0 at high priority
 //	PORTF_INT0MASK |= 0x01;	// F0 will trigger interrupt
@@ -249,12 +248,13 @@ ISR(PORTA_INT0_vect) {
 	PORTF_OUTTGL = 0x40;	// Toggle Red LED
 	TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
 	PORTF_OUTCLR = 0x80;	// Disable ext pull up on XR
+	_delay_ms(30);
 	measureTouchCoordinates();
-	xTouchCoord = (volatile unsigned long)(xTouch & 0xFFF8);
+	xTouchCoord = (volatile unsigned long)(xTouch & 0xFFF8);	// Discard lower 3 bits
 	xTouchCoord -= (volatile unsigned long)ADC_X_OFFSET;
 	xTouchCoord *= (volatile unsigned long)X_COORD_MAX;
 	xTouchCoord /= (volatile unsigned long)ADC_X_MAX_MAG;
-	yTouchCoord = (volatile unsigned long)(yTouch & 0xFFF8);
+	yTouchCoord = (volatile unsigned long)(yTouch & 0xFFF8);	// Discard lower 4 bits
 	yTouchCoord -= (volatile unsigned long)ADC_Y_OFFSET;
 	yTouchCoord *= (volatile unsigned long)Y_COORD_MAX;
 	yTouchCoord /= (volatile unsigned long)ADC_Y_MAX_MAG;
@@ -282,8 +282,8 @@ void adc_take_sample(char axis) {
 
 void adc_enable() {
 	ADCA_CTRLA |= ADC_ENABLE_bm;  // enable ADCA
-	ADCA_REFCTRL |= ADC_REFSEL_AREFA_gc;	// Use AREFA = 2.67 V as reference
-	ADCA_PRESCALER |= ADC_PRESCALER_DIV64_gc;	// Set ADC Clk to 0.5 MHz
+	ADCA_REFCTRL |= ADC_REFSEL_AREFA_gc;	// Use AREFA as reference
+	ADCA_PRESCALER |= ADC_PRESCALER_DIV32_gc;	// Set ADC Clk to 1 MHz
 	ADCA_CH0_CTRL |= ADC_CH_INPUTMODE0_bm;	// Set as Single ended positive input signal
 }
 
