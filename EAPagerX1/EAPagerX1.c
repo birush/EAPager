@@ -13,10 +13,14 @@
 // -------------------------------
 
 // 16 bit Color Definitions ------
+#define TFT_BLACK 0x0000
+#define TFT_WHITE 0xFFFF
 #define TFT_RED 0xF800
 #define TFT_GREEN 0x07E0
 #define TFT_BLUE 0x001F
 #define TFT_ORANGE 0xFBE0
+#define TFT_HS_BACKGROUND_COLOR 0x33FF
+#define TFT_HS_BUTTON_COLOR 0x76EA
 // -------------------------------
 
 #define ADC_X_OFFSET 1700
@@ -66,7 +70,31 @@ int main(void)
 	
 	tft_init();
 	touchInit();
-	tft_print_image(0, TFT_ORANGE);
+	tft_print_image(HS_BACKGROUND_IMAGE, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
+	tft_print_image(HS_MAZES_BUTTON_IMAGE, TFT_HS_BUTTON_COLOR, TFT_BLACK, 48, 68);
+	tft_print_image(HS_SNAKE_BUTTON_IMAGE, TFT_HS_BUTTON_COLOR, TFT_BLACK, 248, 68);
+	tft_print_image(NUM0, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM1, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM2, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM3, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM4, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM5, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM6, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM7, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM8, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM9, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	_delay_ms(500);
+	tft_print_image(NUM1, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM5, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX+PIL_SPACING, PIL_STARTY);
     while(1)
     {
 		//measureTouchCoordinates();
@@ -97,29 +125,55 @@ void tft_print_square(unsigned int xCoord, unsigned int yCoord, unsigned int col
 	//tft_write_command(0x00);
 }
 
-void tft_print_image(unsigned char imageId, unsigned int color) {
-	setWindow(0, 799, 0, 479);
+void tft_print_image(unsigned char imageId, unsigned int backgroundColor, unsigned int foregroundColor, unsigned int xCoord, unsigned int yCoord) {
+
+////// Get array dimensions ///////////////////////////////////////////////
+	unsigned int width, height;
+	
+	if(imageId <= 9) {
+		width=16;
+		height=16;	
+	}
+	else if((imageId >= MAZE0_IMAGE && imageId <= MAZE1_IMAGE) || imageId == HS_BACKGROUND_IMAGE)
+	{
+		width=400;
+		height=240;
+	}
+	else if (imageId >= HS_SNAKE_BUTTON_IMAGE && imageId <= HS_MAZES_BUTTON_IMAGE) {
+		width=104;
+		height=104;
+	}
+//////////////////////////////////////////////////////////////////////////////
+	
+	unsigned int startX = 2*xCoord;
+	unsigned int endX = startX+(2*width)-1;
+	unsigned int startY = 2*yCoord;
+	unsigned int endY = startY+(2*height)-1;
+	volatile unsigned char currentPixel;
+	setWindow(startX, endX, startY, endY);
 	tft_write_command(0x2C);	//Begin RAMWR
-	for (int y=0; y<240; y++) {
-		for (int x=0; x<400; x++) {
-			if (getPixel(0,x,y)) {
-				tft_write_data16(color);
-				tft_write_data16(color);
+	for (int y=0; y<height; y++) {
+		for (int x=0; x<width; x++) {
+			currentPixel = getPixel(imageId,x,y);
+			if (currentPixel) {
+				tft_write_data16(backgroundColor);
+				tft_write_data16(backgroundColor);
 			}
 			else {
-				tft_write_data16(0x0000);
-				tft_write_data16(0x0000);
+				tft_write_data16(foregroundColor);
+				tft_write_data16(foregroundColor);
 			}
 		}
 		
-		for (int x=0; x<400; x++) {
-			if (getPixel(0,x,y)) {
-				tft_write_data16(color);
-				tft_write_data16(color);
+		for (int x=0; x<width; x++) {
+			currentPixel = getPixel(imageId,x,y);
+			if (currentPixel) {
+				tft_write_data16(backgroundColor);
+				tft_write_data16(backgroundColor);
 			}
 			else {
-				tft_write_data16(0x0000);
-				tft_write_data16(0x0000);
+				tft_write_data16(foregroundColor);
+				tft_write_data16(foregroundColor);
 			}
 		}
 	}
@@ -186,6 +240,7 @@ void measureTouchCoordinates() {
 	}
 	xTouch = ADCA_CH0_RES;	// Read ADC value
 	ADCA_INTFLAGS = 0x01;	// Clear ready flag
+	PORTF_OUTTGL = 0x40;	// Toggle Red LED
 	// ------------------------------------------
 	//sei();	// Enable Interrupts
 	//touchSenseInit();	// Setup pins to sense a touch
@@ -201,7 +256,7 @@ void touchSenseReset() {
 	PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
 	PORTA_DIRSET = 0x08;	// Set YD as output
 	PORTA_OUTCLR = 0x08;	// Set YD low
-	PORTA_PIN4CTRL |= 0x02;	// XR sense falling edge
+	PORTA_PIN4CTRL |= 0x03;	// XR sense falling edge
 	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
 	PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR
 	
@@ -214,23 +269,23 @@ void touchSenseReset() {
 void touchSenseInit() {	
 	PORTF_DIRSET = 0x80;	// Set F7 as output
 	
-	touchSenseReset();
+	//PORTA_PIN0CTRL |= 0x18;	// Pullup resistor on AREF
+	PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
+	PORTA_DIRSET = 0x08;	// Set YD as output
+	PORTA_OUTCLR = 0x08;	// Set YD low
+	PORTA_PIN4CTRL |= 0x02;	// XR sense falling edge
+	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
+	PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR
+	
+	// Enable interrupt on XR change (PORTA_INT0) ----
+	PORTA_INTFLAGS |= 0x01;	// Clear PORTA Int0 Int Flag
+	sei();
+	PORTA_INTCTRL = 0x03;	// Enable PORTA INT0 at high priority
 		
 	PMIC_CTRL |= 0x04;	// Enable High level interrupts in PMIC
 	PORTA_INTCTRL = 0x03;	// Enable INT0 at high priority
 	PORTA_INT0MASK |= 0x10;	// PA4 (XR) will trigger PORTA INT0
-
-// --------Route Event from PORTA to Timer?
-	
-//	PORTF_INTCTRL = 0x03;	// Enable INT0 at high priority
-//	PORTF_INT0MASK |= 0x01;	// F0 will trigger interrupt
-	
-//	PORTF_DIRSET = 0x01;	// Set F0 as output
-//	PORTF_OUTSET = 0x01;	// Set F0 high
-//	EVSYS_CH2MUX = 0x78;	// PORTF pin0 is event ch2 source
-	//EVSYS_CH1MUX = 0x58;	// PORTA pin4 is event ch1 source
-		
-		
+			
 	// Setup Timer1 for Debouncing
 	TCC1_CTRLB = 0x00;	// Normal counting mode
 	//TCC1_CTRLD = 0x49;	// Will start ext. ctrld up/down count on event from ch1
@@ -248,7 +303,7 @@ ISR(PORTA_INT0_vect) {
 	PORTF_OUTTGL = 0x40;	// Toggle Red LED
 	TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
 	PORTF_OUTCLR = 0x80;	// Disable ext pull up on XR
-	_delay_ms(30);
+	_delay_ms(100);
 	measureTouchCoordinates();
 	xTouchCoord = (volatile unsigned long)(xTouch & 0xFFF8);	// Discard lower 3 bits
 	xTouchCoord -= (volatile unsigned long)ADC_X_OFFSET;
