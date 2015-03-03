@@ -23,12 +23,14 @@
 #define TFT_HS_BUTTON_COLOR 0x76EA
 // -------------------------------
 
-#define ADC_X_OFFSET 1700
+#define ADC_X_OFFSET 1000
 #define X_COORD_MAX 400
-#define ADC_X_MAX_MAG (4095-ADC_X_OFFSET)
-#define ADC_Y_OFFSET 1475
+#define ADC_X_MAX_MAG 3300
+//#define ADC_X_MAX_MAG (4095-ADC_X_OFFSET)
+#define ADC_Y_OFFSET 1200
 #define Y_COORD_MAX 240
-#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
+#define ADC_Y_MAX_MAG 2900
+//#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
 
 #define XAXIS ((char)0)
 #define YAXIS ((char)1)
@@ -46,6 +48,8 @@
 volatile unsigned int adcValue = 0;
 volatile unsigned int xTouch=0, yTouch=0;
 volatile unsigned long xTouchCoord, yTouchCoord;
+volatile unsigned char currentProgram = MAIN_MENU_ID;
+volatile unsigned char changingProgram = 0;
 unsigned int debug, debug1;
 
 /*
@@ -70,43 +74,60 @@ int main(void)
 	
 	tft_init();
 	touchInit();
-	tft_print_image(HS_BACKGROUND_IMAGE, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
-	tft_print_image(HS_MAZES_BUTTON_IMAGE, TFT_HS_BUTTON_COLOR, TFT_BLACK, 48, 68);
-	tft_print_image(HS_SNAKE_BUTTON_IMAGE, TFT_HS_BUTTON_COLOR, TFT_BLACK, 248, 68);
-	tft_print_image(NUM0, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+
+/*	tft_print_image(NUM0_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM1, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM1_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM2, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM2_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM3, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM3_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM4, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM4_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM5, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM5_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM6, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM6_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM7, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM7_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM8, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM8_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM9, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM9_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
-	tft_print_image(NUM1, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	tft_print_image(NUM5, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX+PIL_SPACING, PIL_STARTY);
+	tft_print_image(NUM1_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+	tft_print_image(NUM5_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX+PIL_SPACING, PIL_STARTY);
+*/
     while(1)
     {
-		//measureTouchCoordinates();
-		debug1Function();
-	
+		//  Main Menu /////////////////////////////////////////////////////////////////////////
+		if (currentProgram == MAIN_MENU_ID) {
+			// Program initialization
+			tft_print_image(HS_BACKGROUND_IMAGE_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
+			tft_print_image(HS_MAZES_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_MAZES_BUTTON_STARTX, HS_MAZES_BUTTON_STARTY);
+			tft_print_image(HS_SNAKE_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_SNAKE_BUTTON_STARTX, HS_SNAKE_BUTTON_STARTY);
+			changingProgram = 0;
+			touchSenseReset();
+			
+			while (!changingProgram) {
+				debug1 = 5;
+			}
+		}
+		////////////////////////////////////////////////////////////////////////////////////////////
 		
-		
-/*		tft_print_square(100, 100, 0xFFFF, 100);
-		_delay_ms(1000);
-		tft_print_square(100, 100, 0x001F, 100);
-		_delay_ms(1000);
-*/
+		// Maze Game ///////////////////////////////////////////////////////////////////////////////
+		else if (currentProgram == MAZE_GAME_ID) {
+			// Program initialization
+			tft_print_image(MAZE0_IMAGE_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
+			tft_print_image(MAIN_MENU_BUTTON_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
+			changingProgram = 0;
+			touchSenseReset();
+			
+			while (!changingProgram) {
+				debug1 = 3;
+			}
+		}
+		///////////////////////////////////////////////////////////////////////////////////////
 
     }
 
@@ -131,17 +152,22 @@ void tft_print_image(unsigned char imageId, unsigned int backgroundColor, unsign
 	unsigned int width, height;
 	
 	if(imageId <= 9) {
-		width=16;
-		height=16;	
+		width=NUM_WIDTH;
+		height=NUM_HEIGHT;	
 	}
-	else if((imageId >= MAZE0_IMAGE && imageId <= MAZE1_IMAGE) || imageId == HS_BACKGROUND_IMAGE)
+	else if((imageId >= MAZE0_IMAGE_ID && imageId <= MAZE1_IMAGE_ID) || imageId == HS_BACKGROUND_IMAGE_ID)
 	{
-		width=400;
-		height=240;
+		width=FULL_IMAGE_WIDTH;
+		height=FULL_IMAGE_HEIGHT;
 	}
-	else if (imageId >= HS_SNAKE_BUTTON_IMAGE && imageId <= HS_MAZES_BUTTON_IMAGE) {
-		width=104;
-		height=104;
+	else if (imageId >= HS_SNAKE_BUTTON_IMAGE_ID && imageId <= HS_MAZES_BUTTON_IMAGE_ID) {
+		width=HS_BUTTON_IMAGE_WIDTH;
+		height=HS_BUTTON_IMAGE_HEIGHT;
+	}
+	
+	else if (imageId == MAIN_MENU_BUTTON_ID) {
+		width = MAIN_MENU_BUTTON_WIDTH;
+		height = MAIN_MENU_BUTTON_HEIGHT;
 	}
 //////////////////////////////////////////////////////////////////////////////
 	
@@ -217,29 +243,41 @@ void alternateColors() {
 }
 
 void measureTouchCoordinates() {
+	int numSamples = 16;
 	// Checking Y coordinate ---------------------
 	PORTA_DIRSET = 0x14;	// Set XL and XR as outputs
 	PORTA_DIRCLR = 0x0A;	// Set YU and YD as inputs
 	PORTA_OUTSET = 0x10;	// Set XR high
 	PORTA_OUTCLR = 0x04;	// Set XL low
-	adc_take_sample('x');
-	while (!(ADCA_INTFLAGS & (1 << 0))) {	//Wait for ADC to finish sampling
-		debug=0;
+	yTouch=0;
+	for (int i=0; i<numSamples; i++) {
+		adc_take_sample('x');
+		while (!(ADCA_INTFLAGS & (1 << 0))) {	//Wait for ADC to finish sampling
+			debug=0;
+		}
+		yTouch += ADCA_CH0_RES;	// Read ADC value
+		ADCA_INTFLAGS = 0x01;	// Clear ready flag
+		_delay_us(4);
 	}
-	yTouch = ADCA_CH0_RES;	// Read ADC value
-	ADCA_INTFLAGS = 0x01;	// Clear ready flag
+	yTouch /= numSamples;
+
 	// ------------------------------------------
 	// Checking X coordinate --------------------
 	PORTA_DIRSET = 0x0A;	// Set YU and YD as outputs
 	PORTA_DIRCLR = 0x14;	// set XL and XR as inputs
 	PORTA_OUTSET = 0x02;	// Set YU high
 	PORTA_OUTCLR = 0x08;	// Set YD low
-	adc_take_sample('y');
-	while (!(ADCA_INTFLAGS & (1 << 0))) {	//Wait for ADC to finish sampling
-		debug=0;
+	xTouch=0;
+	for (int i=0; i<numSamples; i++) {
+		adc_take_sample('y');
+		while (!(ADCA_INTFLAGS & (1 << 0))) {	//Wait for ADC to finish sampling
+			debug=0;
+		}
+		xTouch += ADCA_CH0_RES;	// Read ADC value
+		ADCA_INTFLAGS = 0x01;	// Clear ready flag
+		_delay_us(4);
 	}
-	xTouch = ADCA_CH0_RES;	// Read ADC value
-	ADCA_INTFLAGS = 0x01;	// Clear ready flag
+	xTouch /= numSamples;
 	PORTF_OUTTGL = 0x40;	// Toggle Red LED
 	// ------------------------------------------
 	//sei();	// Enable Interrupts
@@ -303,7 +341,7 @@ ISR(PORTA_INT0_vect) {
 	PORTF_OUTTGL = 0x40;	// Toggle Red LED
 	TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
 	PORTF_OUTCLR = 0x80;	// Disable ext pull up on XR
-	_delay_ms(100);
+	_delay_ms(80);
 	measureTouchCoordinates();
 	xTouchCoord = (volatile unsigned long)(xTouch & 0xFFF8);	// Discard lower 3 bits
 	xTouchCoord -= (volatile unsigned long)ADC_X_OFFSET;
@@ -313,7 +351,27 @@ ISR(PORTA_INT0_vect) {
 	yTouchCoord -= (volatile unsigned long)ADC_Y_OFFSET;
 	yTouchCoord *= (volatile unsigned long)Y_COORD_MAX;
 	yTouchCoord /= (volatile unsigned long)ADC_Y_MAX_MAG;
-	tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 10);
+	tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 10);		// show where touch was
+	
+	switch (currentProgram) {
+		case MAIN_MENU_ID:
+			if ((xTouchCoord > HS_MAZES_BUTTON_STARTX) && (xTouchCoord < (HS_MAZES_BUTTON_STARTX+HS_BUTTON_IMAGE_WIDTH))) {
+				if ((yTouchCoord > HS_MAZES_BUTTON_STARTY) && (yTouchCoord < (HS_SNAKE_BUTTON_STARTY+HS_BUTTON_IMAGE_HEIGHT))) {
+					currentProgram = 1;
+					changingProgram = 1;
+				}
+			}
+			break;
+		case MAZE_GAME_ID:
+			if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
+				if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
+					currentProgram = 0;
+					changingProgram = 1;
+				}
+			}
+			break;
+	}
+	debug = 3;
 }
 
 // After Debouncing period, detect touches again
@@ -321,7 +379,9 @@ ISR(TCC1_CCB_vect) {
 	PORTF_OUTTGL = 0x20;	// Toggle Blue LED
 	TCC1_CTRLA = 0x00;	// Stop timer
 	TCC1_CTRLFSET = 0x08;	//Restart timer
-	touchSenseReset();
+	if (!changingProgram) {
+		touchSenseReset();
+	}
 }
 
 void adc_take_sample(char axis) {
@@ -337,9 +397,10 @@ void adc_take_sample(char axis) {
 
 void adc_enable() {
 	ADCA_CTRLA |= ADC_ENABLE_bm;  // enable ADCA
-	ADCA_REFCTRL |= ADC_REFSEL_AREFA_gc;	// Use AREFA as reference
+	ADCA_REFCTRL |= ADC_REFSEL_INTVCC_gc;	// Use INTVCC=2.06 V as reference
 	ADCA_PRESCALER |= ADC_PRESCALER_DIV32_gc;	// Set ADC Clk to 1 MHz
 	ADCA_CH0_CTRL |= ADC_CH_INPUTMODE0_bm;	// Set as Single ended positive input signal
+	//ADCA_CTRLB |= ADC_FREERUN_bm;	// Set to Freerunning
 }
 
 void tft_write_command(char command) {

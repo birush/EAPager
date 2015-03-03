@@ -21,4 +21,6 @@ extern const unsigned char num7[16][2];
 extern const unsigned char num8[16][2];
 extern const unsigned char num9[16][2];
 
+extern const unsigned char mainMenuButton[16][9];
+
 #endif
