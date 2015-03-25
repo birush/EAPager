@@ -23,14 +23,27 @@
 #define TFT_HS_BUTTON_COLOR 0x76EA
 // -------------------------------
 
-#define ADC_X_OFFSET 1000
+// Touch Sensing Calibration ------------------
+#define ADC_X_OFFSET 510
 #define X_COORD_MAX 400
 #define ADC_X_MAX_MAG 3300
 //#define ADC_X_MAX_MAG (4095-ADC_X_OFFSET)
-#define ADC_Y_OFFSET 1200
+#define ADC_Y_OFFSET 1100
 #define Y_COORD_MAX 240
-#define ADC_Y_MAX_MAG 2900
+#define ADC_Y_MAX_MAG 3000
 //#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
+// --------------------------------------------
+
+// Timing Constants ---------------------------
+#define VB_ONE 31250
+#define VB_THREE_FOURTHS 23438
+#define VB_HALF 15625
+#define VB_THREE_EIGHTHS 11719
+#define VB_FOURTH 7813
+#define VB_EIGHTH 3906
+#define VB_SIXTEENTH 1953
+// --------------------------------------------
+
 
 #define XAXIS ((char)0)
 #define YAXIS ((char)1)
@@ -50,6 +63,7 @@ volatile unsigned int xTouch=0, yTouch=0;
 volatile unsigned long xTouchCoord, yTouchCoord;
 volatile unsigned char currentProgram = MAIN_MENU_ID;
 volatile unsigned char changingProgram = 0;
+volatile unsigned char vBCyclesLeft = 3;
 unsigned int debug, debug1;
 
 /*
@@ -70,11 +84,15 @@ int main(void)
 {
 	clock_init();
 	//playMazeGame();
-	PORTF_DIRSET = 0x60;	// Enable LED ports
+	PORTB_DIRSET = 0x60;	// Enable LED ports
+	//PORTB_OUTTGL = 0x40;
 	
 	tft_init();
+	
 	touchInit();
-
+	vibrate_init();
+	//PORTB_OUTTGL = 0x40;
+	
 /*	tft_print_image(NUM0_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
 	_delay_ms(500);
 	tft_print_image(NUM1_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
@@ -100,6 +118,7 @@ int main(void)
 */
     while(1)
     {
+		//PORTB_OUTTGL = 0x20;
 		//  Main Menu /////////////////////////////////////////////////////////////////////////
 		if (currentProgram == MAIN_MENU_ID) {
 			// Program initialization
@@ -122,6 +141,9 @@ int main(void)
 			tft_print_image(MAIN_MENU_BUTTON_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
 			changingProgram = 0;
 			touchSenseReset();
+
+//			vibrate(VB_HALF);			
+			vibrate_pulsed_start(VB_ONE, VB_EIGHTH, 5);
 			
 			while (!changingProgram) {
 				debug1 = 3;
@@ -131,6 +153,59 @@ int main(void)
 
     }
 
+}
+
+void vibrate_pulsed_start(unsigned int onTime, unsigned int offTime, unsigned char numCycles) {
+	vBCyclesLeft = numCycles;
+	TCF0_CTRLB = 0x60;		// Enable CCB and CCC only
+	TCF0_INTCTRLB = 0x28;	// CCB, CCC interrupts enabled at medium priority
+	unsigned int period = onTime + offTime;
+	TCF0_PER = period;
+	TCF0_CCB = onTime;			// Set on time
+	TCF0_CCC = period;			// Set off time
+	PORTB_OUTSET = 0x01;	// Turn on vibration motor
+	TCF0_CTRLA = 0x07;	// Start vibration timer at 31.25 kHz
+}
+
+void vibrate_pulsed_stop() {
+	PORTB_OUTCLR = 0x01;	// Turn off vibration motor
+	TCF0_CTRLA = 0x00;		// Stop timer
+	TCF0_CTRLFSET = 0x08;	//Restart timer
+}
+
+ISR(TCF0_CCB_vect) {
+	PORTB_OUTCLR = 0x01;	// Turn off vibration motor
+	if (--vBCyclesLeft == 0) {
+		TCF0_CTRLA = 0x00;		// Stop timer
+		TCF0_CTRLFSET = 0x08;	//Restart timer
+	}
+}
+
+ISR(TCF0_CCC_vect) {
+	PORTB_OUTSET = 0x01;	// Turn on vibration motor
+}
+
+void vibrate(unsigned int time32uS) {
+	TCF0_CTRLB = 0x10;		// Enable CCA Only
+	TCF0_INTCTRLB = 0x02;	// CCA interrupt enabled at medium priority
+	TCF0_PER = time32uS;	// Set Top
+	TCF0_CCA = time32uS;	// Set CCA	// Interrupt will occur at (time32uS * 32) us
+	PORTB_OUTSET = 0x01;	// Turn on vibration motor
+	TCF0_CTRLA = 0x07;	// Start vibration timer at 31.25 kHz
+}
+
+ISR(TCF0_CCA_vect) {
+	PORTB_OUTCLR = 0x01;	// Turn off vibration motor
+	TCF0_CTRLA = 0x00;		// Stop timer
+	TCF0_CTRLFSET = 0x08;	//Restart timer
+}
+
+void vibrate_init() {
+	PORTB_DIRSET = 0x01;	// Enable vibration control port
+
+	// Setup Timer0F for timing
+	PMIC_CTRL |= 0x02;	// Enable Medium level interrupts in PMIC
+	TCF0_CTRLB = 0x00;	// Normal counting mode
 }
 
 void tft_print_square(unsigned int xCoord, unsigned int yCoord, unsigned int color, unsigned char size) {
@@ -168,6 +243,11 @@ void tft_print_image(unsigned char imageId, unsigned int backgroundColor, unsign
 	else if (imageId == MAIN_MENU_BUTTON_ID) {
 		width = MAIN_MENU_BUTTON_WIDTH;
 		height = MAIN_MENU_BUTTON_HEIGHT;
+	}
+	
+	else {
+		width = 0;
+		height = 0;
 	}
 //////////////////////////////////////////////////////////////////////////////
 	
@@ -278,7 +358,7 @@ void measureTouchCoordinates() {
 		_delay_us(4);
 	}
 	xTouch /= numSamples;
-	PORTF_OUTTGL = 0x40;	// Toggle Red LED
+	PORTB_OUTTGL = 0x40;	// Toggle Red LED
 	// ------------------------------------------
 	//sei();	// Enable Interrupts
 	//touchSenseInit();	// Setup pins to sense a touch
@@ -290,57 +370,54 @@ void touchInit() {
 }
 
 void touchSenseReset() {
-	//PORTA_PIN0CTRL |= 0x18;	// Pullup resistor on AREF
 	PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
 	PORTA_DIRSET = 0x08;	// Set YD as output
 	PORTA_OUTCLR = 0x08;	// Set YD low
 	PORTA_PIN4CTRL |= 0x03;	// XR sense falling edge
 	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
-	PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR
+	PORTB_OUTSET = 0x80;	// Set F7 high, external pullup for XR
+	_delay_us(100);
 	
 	// Enable interrupt on XR change (PORTA_INT0) ----
-	PORTA_INTFLAGS |= 0x01;	// Clear PORTA Int0 Int Flag
+	PORTA_INTFLAGS = 0x01;	// Clear PORTA Int0 Int Flag
 	sei();
 	PORTA_INTCTRL = 0x03;	// Enable PORTA INT0 at high priority
+	PORTA_INT0MASK = 0x10;	// PA4 (XR) will trigger PORTA INT0
 }
 
 void touchSenseInit() {	
-	PORTF_DIRSET = 0x80;	// Set F7 as output
-	
-	//PORTA_PIN0CTRL |= 0x18;	// Pullup resistor on AREF
-	PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs
+	PORTB_DIRSET = 0x80;	// Set B7 as output
+	PORTA_DIRCLR = 0x16;	// Set XL, XR, YU as inputs	
 	PORTA_DIRSET = 0x08;	// Set YD as output
 	PORTA_OUTCLR = 0x08;	// Set YD low
 	PORTA_PIN4CTRL |= 0x02;	// XR sense falling edge
 	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
-	PORTF_OUTSET = 0x80;	// Set F7 high, external pullup for XR
+	PORTB_OUTSET = 0x80;	// Set B7 high, external pullup for XR
+	
 	
 	// Enable interrupt on XR change (PORTA_INT0) ----
 	PORTA_INTFLAGS |= 0x01;	// Clear PORTA Int0 Int Flag
 	sei();
-	PORTA_INTCTRL = 0x03;	// Enable PORTA INT0 at high priority
-		
 	PMIC_CTRL |= 0x04;	// Enable High level interrupts in PMIC
 	PORTA_INTCTRL = 0x03;	// Enable INT0 at high priority
-	PORTA_INT0MASK |= 0x10;	// PA4 (XR) will trigger PORTA INT0
-			
+	PORTA_INT0MASK = 0x10;	// PA4 (XR) will trigger PORTA INT0
+	
 	// Setup Timer1 for Debouncing
 	TCC1_CTRLB = 0x00;	// Normal counting mode
-	//TCC1_CTRLD = 0x49;	// Will start ext. ctrld up/down count on event from ch1
 	TCC1_INTCTRLB = 0x0C;	// CCB interupt enabled at high priority
 	TCC1_PER = 7813;	// Top = 7813
-	TCC1_CCB = 7813;	// CCB = 7813	// Interrupt will occur at .25 s	
+	TCC1_CCB = 7813;	// CCB = 7813	// Interrupt will occur at .25 s
 }
 
 // When Touch detected
 ISR(PORTA_INT0_vect) {
-	//EVSYS_DATA |= 0x06;
-	//EVSYS_STROBE |= 0x06;	// Trigger Event Ch1 and Ch2 to start debounce counter
+	PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
 	PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
 	cli();
-	PORTF_OUTTGL = 0x40;	// Toggle Red LED
+	PORTB_OUTTGL = 0x40;	// Toggle Red LED
 	TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
-	PORTF_OUTCLR = 0x80;	// Disable ext pull up on XR
+	PORTB_OUTSET = 0x20;	// LED1 ON
+	PORTB_OUTCLR = 0x80;	// Disable ext pull up on XR
 	_delay_ms(80);
 	measureTouchCoordinates();
 	xTouchCoord = (volatile unsigned long)(xTouch & 0xFFF8);	// Discard lower 3 bits
@@ -376,12 +453,13 @@ ISR(PORTA_INT0_vect) {
 
 // After Debouncing period, detect touches again
 ISR(TCC1_CCB_vect) {
-	PORTF_OUTTGL = 0x20;	// Toggle Blue LED
 	TCC1_CTRLA = 0x00;	// Stop timer
 	TCC1_CTRLFSET = 0x08;	//Restart timer
 	if (!changingProgram) {
 		touchSenseReset();
 	}
+	PORTA_INTFLAGS = 0x01;	// Clear PORTA Int0 Int Flag
+	PORTB_OUTCLR = 0x20;	// LED1 OFF
 }
 
 void adc_take_sample(char axis) {
@@ -406,7 +484,7 @@ void adc_enable() {
 void tft_write_command(char command) {
 	PORTA_OUTCLR = TFTDC;	// Set DC low (command)
 	//PORTA &= TFTCS_L;
-	PORTB_OUT = command;	// Put command on bus
+	PORTE_OUT = command;	// Put command on bus
 	PORTA_OUTCLR = TFTWR;
 	PORTA_OUTSET = TFTWR;	// Lock in data
 	//PORTA |= TFTCS_H;
@@ -416,7 +494,7 @@ void tft_write_command(char command) {
 void tft_write_data8(char data8) {
 	PORTA_OUTSET = TFTDC;	// Set DC high (data)
 	//PORTA &= TFTCS_L;
-	PORTB_OUT = data8;
+	PORTE_OUT = data8;
 	PORTA_OUTCLR = TFTWR;
 	PORTA_OUTSET = TFTWR;	// Lock in data
 	//PORTA |= TFTCS_H;
@@ -426,8 +504,8 @@ void tft_write_data8(char data8) {
 void tft_write_data16(unsigned int data) {
 	PORTA_OUTSET = TFTDC;	// Set DC high (data)
 	//PORTA &= TFTCS_L;
-	PORTB_OUT = (char)(data & 0x00FF); // write low byte to DB
-	PORTC_OUT = (char)((data & 0xFF00) >> 8); // write high byte to DB
+	PORTE_OUT = (char)(data & 0x00FF); // write low byte to DB
+	PORTF_OUT = (char)((data & 0xFF00) >> 8); // write high byte to DB
 	PORTA_OUTCLR = TFTWR;
 	PORTA_OUTSET = TFTWR;	// Lock in data
 	//PORTA |= TFTCS_H;
@@ -450,8 +528,8 @@ void setWindow(unsigned int xStart, unsigned int xEnd, unsigned int yStart, unsi
 }
 
 void tft_init() {
-	PORTB_DIRSET = 0xFF;
-	PORTC_DIRSET = 0xFF;	//Set 16 bit data bus pins as outputs
+	PORTE_DIRSET = 0xFF;
+	PORTF_DIRSET = 0xFF;	//Set 16 bit data bus pins as outputs
 	PORTA_DIRSET = 0xE0;	//Set highest 3 bits of PORTA as outputs (tft control pins)
 	
 	//PORTA &= TFTCS_L;
@@ -465,10 +543,13 @@ void tft_init() {
 	//PORTA |= TFTCS_H;
 	PORTA_OUTSET = TFTWR;
 	
+	PORTB_OUTTGL = 0x20;
+	
 	tft_write_command(0xB9);	//SETEXTC
 	tft_write_data8(0xFF);
 	tft_write_data8(0x83);
 	tft_write_data8(0x69);
+	
 	
 	tft_write_command(0xB1);	//SETPOWER
 	tft_write_data8(0x01);
@@ -491,6 +572,7 @@ void tft_init() {
 	tft_write_data8(0xE6);
 	tft_write_data8(0xE6);
 	
+	
 	tft_write_command(0xB2); //SETDISP
 	tft_write_data8(0x00);
 	tft_write_data8(0x20);
@@ -508,6 +590,7 @@ void tft_init() {
 	tft_write_data8(0x00);
 	tft_write_data8(0x01);
 	
+	
 	tft_write_command(0xB4);	//SETCYC
 	tft_write_data8(0x00);
 	tft_write_data8(0x18);
@@ -515,9 +598,11 @@ void tft_init() {
 	tft_write_data8(0x10);
 	tft_write_data8(0x01);
 	
+	
 	tft_write_command(0xB6);	//SETVCOM
 	tft_write_data8(0x2C);
 	tft_write_data8(0x2C);
+	
 	
 	tft_write_command(0xD5);	//SETGIP
 	tft_write_data8(0x00);
@@ -546,6 +631,7 @@ void tft_init() {
 	tft_write_data8(0x0F);
 	tft_write_data8(0x02);
 	tft_write_data8(0x00);
+	
 	
 	tft_write_command(0xE0);		//GAMMA
 	tft_write_data8(0x00);
@@ -627,8 +713,8 @@ void debug1Function() {
 }
 
 void clock_init() {
-	PORTD_DIRSET = 0x80;		// Set PORTD7 as output
-	PORTCFG_CLKEVOUT = 0x02;	// Output per clock to PortD pin 7
+	//PORTD_DIRSET = 0x80;		// Set PORTD7 as output
+	//PORTCFG_CLKEVOUT = 0x02;	// Output per clock to PortD pin 7
 	OSC_CTRL |= OSC_RC32MEN_bm;	// Enable 32 MHz internal Osc
 //	OSC_CTRL |= OSC_RC32KEN_bm;	// Enable 32.768 kHz internal Oscillator
 	while (!(OSC_STATUS & OSC_RC32MRDY_bm)) {	// Wait till new clock ready

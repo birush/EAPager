@@ -18,6 +18,11 @@ void adc_enable();
 void adc_take_sample(char);
 void debug1Function(void);
 void alternateColors(void);
+void touchSenseReset(void);
+void vibrate_init(void);
+void vibrate(unsigned int);
+void vibrate_pulsed_start(unsigned int, unsigned int, unsigned char);
+void vibrate_pulsed_stop(void);
 
 
 #endif
