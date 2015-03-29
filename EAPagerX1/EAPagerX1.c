@@ -52,7 +52,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/pgmspace.h>
-//#include <C:/Program Files (x86)/Atmel/Atmel Toolchain/AVR8 GCC/Native/3.4.1056/avr8-gnu-toolchain/avr/include/avr/pgmspace.h>
+#include <math.h>
 #include <avr/interrupt.h>
 #include "EAimages.h"
 #include "MazeGame.h"
@@ -66,59 +66,48 @@ volatile unsigned char changingProgram = 0;
 volatile unsigned char vBCyclesLeft = 3;
 unsigned int debug, debug1;
 
-/*
-const unsigned int ADC_X_OFFSET = 3250;
-const unsigned int X_COORD_MAX = 400;
-unsigned int ADC_X_MAX_MAG = 4096-ADC_X_OFFSET;
-const unsigned int ADC_Y_OFFSET = 1000;
-const unsigned int Y_COORD_MAX = 240;
-unsigned int ADC_Y_MAX_MAG = 1460;
-*/
-
 const unsigned char LUT_RED_INC = 8;
 const unsigned char LUT_GREEN_INC = 4;
 const unsigned char LUT_BLUE_INC = 8;
 
 
+// Frankie --------------------------------------------
+//GLOBALS NEEDED FOR SOUND
+const unsigned long int clkFreq=32000000;
+const unsigned int preScaler=1;
+const unsigned int sampleNum = 50;
+unsigned int noteLength=8;
+unsigned int currentFreq=0;
+unsigned int subCount2=0,subCount3=1;
+unsigned long int subCount1=0,uberCount=0;
+
+//unsigned long int musicArray[4]={0x0400 | 49,0x0800| 1,0x0400|88,0};
+unsigned long int musicArray[12]={0x431,0x231,0x832,0x22D,0x22E,0x22F,0x230,0x12F,0x130,0x12F,0x130,0};
+unsigned int musicArrayCount=0;//Change datatype as required
+
+unsigned int sinArray[50],id1=0,id3=0;
+unsigned long int id2=0;//DEBUG
+//const double freqArray[88]={0,27.5,29.135,32.703,34.648,36.708,38.891,41.204,43.654,46.250,49.000,51.913,55,58.270,61.735,65.406,69.296,73.416,77.782,82.407,87.307,92.499,97.999,103.826,110,116.541,123.471,130.813,138.591,146.832,155.563,164.814,174.614,184.997,195.998,207.652,220,233.082,246.942,261.626,277.183,293.665,311.127,329.628,349.228,369.994,391.995,415.305,440,466.164,493.883,523.251,554.365,587.330,622.254,659.255,698.456,739.989,783.991,830.609,880,932.328,987.767,1046.5,1108.73,1174.66,1244.51,1318.51,1396.91,1479.98,1567.98,1661.22,1760,1864,1975.53,2093,2217.46,2349.32,2489.02,2637.02,2793.83,2959.96,3135.96,3322.44,3520,3729.31,3951.07,4186.01};
+const double freqArray[89]={0,27.5,29.135,30.87,32.703,34.648,36.708,38.891,41.204,43.654,46.250,49.000,51.913,55,58.270,61.735,65.406,69.296,73.416,77.782,82.407,87.307,92.499,97.999,103.826,110,116.541,123.471,130.813,138.591,146.832,155.563,164.814,174.614,184.997,195.998,207.652,220,233.082,246.942,261.626,277.183,293.665,311.127,329.628,349.228,369.994,391.995,415.305,440,466.164,493.883,523.251,554.365,587.330,622.254,659.255,698.456,739.989,783.991,830.609,880,932.328,987.767,1046.5,1108.73,1174.66,1244.51,1318.51,1396.91,1479.98,1567.98,1661.22,1760,1864,1975.53,2093,2217.46,2349.32,2489.02,2637.02,2793.83,2959.96,3135.96,3322.44,3520,3729.31,3951.07,4186.01};
+// --------------------------------------------------------------------------
+
+
 int main(void)
 {
 	clock_init();
-	//playMazeGame();
-	PORTB_DIRSET = 0x60;	// Enable LED ports
+	//PORTB_DIRSET = 0x60;	// Enable LED ports
 	//PORTB_OUTTGL = 0x40;
-	
 	tft_init();
-	
 	touchInit();
 	vibrate_init();
-	//PORTB_OUTTGL = 0x40;
-	
-/*	tft_print_image(NUM0_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM1_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM2_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM3_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM4_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM5_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM6_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM7_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM8_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM9_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	_delay_ms(500);
-	tft_print_image(NUM1_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-	tft_print_image(NUM5_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX+PIL_SPACING, PIL_STARTY);
-*/
+	SPID_init();
+	TIMER_CONFIG();
+	SPIC_init();
+	COM_INIT();
+	COM_RX_MODE();
+
     while(1)
     {
-		//PORTB_OUTTGL = 0x20;
 		//  Main Menu /////////////////////////////////////////////////////////////////////////
 		if (currentProgram == MAIN_MENU_ID) {
 			// Program initialization
@@ -727,3 +716,429 @@ void clock_init() {
 	DFLLRC32M_COMP2 = 0xCD;	// Set Oscillator Output to 54 MHz
 */
 }
+
+// Frankie ------------------------------------------------------------------
+
+void makeSineWave() {
+	int iii;
+	unsigned int temp;
+	double sinC[49];
+	//unsigned int sinArray[50];
+	for(iii=0;iii<50;iii++){//construct sinArray
+		sinC[iii]=100+100*sin(2*M_PI*iii/(50));
+		sinArray[iii]=(unsigned int)(sinC[iii]);
+		//	sinArray[iii]=(unsigned int)100*sin(2*M_PI*iii/(50));
+	}
+}
+
+void SPIC_init(){
+	// Set MOSI,SS and SCK, CE output.
+	PORTC_DIRSET=0xB6;
+	// Enable SPI, Master, set clock rate fck/128
+	SPIC_CTRL=0x50;//50
+	
+	PORTC_OUTSET =0x10;// set SS[CSN] High
+	PORTC_OUTCLR = 0x02;//set CE of TR to 0
+}
+
+void SPID_init(){
+	// Set MOSI,SS and SCK as output.
+	PORTD_DIRSET=0xB0;
+	// Enable SPI, Master, set clock rate fck/128
+	//SPID_CTRL=0x50;//enable SPID, master mode
+	SPID_CTRL=0xD0;//Enable SPI, master mode,  x2 sck freq.
+	PORTD_OUTSET =0x10;// set SS[CSN] High
+}
+
+void COM_INIT(){
+	//Write to  CONFIG reg:mask all interrupts, Power up , CRC 1 byte, TX mode
+	//Write to  reg, 0x3A: pwr_up=1,
+	COM_WRITE(1,0x00,0x3A,0,0,0,0);
+	//Enable RX_DR Interrupt via IRQ pin. low true if received data (C0, pin16)
+	sei();
+	PMIC_CTRL|=0x02;
+	PORTC_INTCTRL=0x02;//set as medium priority.
+	PORTC_INT0MASK=0x01;//C0 set
+	PORTC_PIN0CTRL |=0x02;//to sense falling edge(0x02)
+	//Write RX addr
+	COM_WRITE(5,0x0A,0xAA,0x12,0x13,0x14,0x15);
+	//Write TX addr
+	COM_WRITE(5,0x10,0xBB,0x89,0x87,0x86,0x85);
+	//DEBUG:Setpower to low, ch17
+	//COM_WRITE(1,0x06,0x09,0,0,0,0);
+	//COM_WRITE(1,0x05,0x25,0,0,0,0);
+}
+
+unsigned int COM_STATUS(){
+	//send CMD word
+	unsigned int status;
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =0xFF;
+	while(!(SPIC_STATUS & (1<<7)));//Check SPIC_STATUS_IF to see if transmission completed.
+	PORTC_OUTSET=0x10; //set CSN high
+	//recieve data
+	status=SPIC_DATA;
+	return status;
+}
+
+unsigned int COM_READ(unsigned int regValue){
+	//send CMD word
+	unsigned int dataRead;
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =regValue;
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	//recieve data
+	SPIC_DATA=0xFE;//junk data
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	dataRead=SPIC_DATA;
+	PORTC_OUTSET=0x10; //set CSN high
+	return dataRead;
+};
+
+/*
+void COM_READ_LARGE(int numBytes, unsigned int regValue, unsigned int &byte1,unsigned int &byte2,unsigned int &byte3,unsigned int &byte4,unsigned int &byte5){
+	//send CMD word
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =regValue;
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	if(numBytes >=1){
+		SPIC_DATA=0xFE;//junk data
+		while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+		byte1=SPIC_DATA;
+	}
+	if(numBytes >=2){
+		SPIC_DATA=0xFE;//junk data
+		while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+		byte2=SPIC_DATA;
+	}
+	if(numBytes >=3){
+		SPIC_DATA=0xFE;//junk data
+		while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+		byte3=SPIC_DATA;
+	}
+	if(numBytes >=4){
+		SPIC_DATA=0xFE;//junk data
+		while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+		byte4=SPIC_DATA;
+	}
+	if(numBytes == 5){
+		SPIC_DATA=0xFE;//junk data
+		while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+		byte5=SPIC_DATA;
+	}
+	PORTC_OUTSET=0x10; //set CSN high
+}
+*/
+
+void COM_WRITE(int numBytes,unsigned int regValue, unsigned int byte1, unsigned int byte2, unsigned int byte3, unsigned int byte4, unsigned int byte5){
+	//send CMD word
+	regValue=regValue | 0x20;
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =regValue;
+	//while(!(SPSR0 & (1<<SPIF0)));
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	//Transmit bytes, LSB to MSB
+	if(numBytes >=1){
+		SPIC_DATA =byte1;
+		while(!(SPIC_STATUS & (1<<7)));
+	}
+	if(numBytes >=2){
+		SPIC_DATA =byte2;
+		while(!(SPIC_STATUS & (1<<7)));
+	}
+	if(numBytes >=3){
+		SPIC_DATA =byte3;
+		while(!(SPIC_STATUS & (1<<7)));
+	}
+	if(numBytes >=4){
+		SPIC_DATA =byte4;
+		while(!(SPIC_STATUS & (1<<7)));
+	}
+	if(numBytes == 5){
+		SPIC_DATA =byte5;
+		while(!(SPIC_STATUS & (1<<7)));
+	}
+	PORTC_OUTSET=0x10; //set CSN high
+	
+}
+
+void COM_WRITE_PAYLOAD(unsigned int payload){//MUST BE IN TX MODE, 8 bit message. change to higher but  datatype later
+	//send CMD word
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =0xA0;
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	//Transmit bytes, LSB to MSB
+	SPIC_DATA =payload;
+	while(!(SPIC_STATUS & (1<<7)));
+	PORTC_OUTSET=0x10; //set CSN high
+	
+}
+
+unsigned int COM_READ_PAYLOAD(){//MUST be in RX mode. Read payload from RX FIFO
+	unsigned int payload, status,temp;
+	//SET CE LOW
+	PORTC_OUTCLR = 0x02;//set CE to be 0;
+	//COM_READ(0x17,temp);//DEBUG
+	
+	//send CMD word
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =0x61;
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	//recieve data
+	SPIC_DATA=0xFE;//junk data
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	payload=SPIC_DATA;
+	PORTC_OUTSET=0x10; //set CSN high
+	
+	//COM_READ(0x17,temp);//DEBUG
+	temp=0x00;
+	
+	//Reset RX_DR Pin via RX_DR bit in status
+	status = COM_STATUS();
+	temp= status | 0x40;//sets RX_DR to 1
+	COM_WRITE(1,0x07,temp,0,0,0,0);
+	//COM_STATUS(status);//DEBUG:get status
+	//set CE high to re-enter active RX mode
+	PORTC_OUTSET = 0x02; 	//set CE to be 1
+	return payload;
+	
+}
+
+void COM_FLUSH_TX(){
+	//send CMD word
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =0xE1;
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	PORTC_OUTSET=0x10; //set CSN high
+}
+
+void COM_FLUSH_RX(){
+	//send CMD word
+	PORTC_OUTCLR=0x10;//Start transmission, set CSN low
+	SPIC_DATA =0xE2;
+	while(!(SPIC_STATUS & (1<<7)));// Wait for transmission to complete
+	PORTC_OUTSET=0x10; //set CSN high
+}
+
+void COM_TX(unsigned int payload){//8 bit message, change to higher bit length datatype later
+	unsigned int temp, status,wait=1;
+	PORTC_OUTCLR = 0x02;//SET CE to be 0
+	//Set CONGIF bit PRIM_RX to low.
+	temp = COM_READ(0x00);
+	temp &= 0xFE;
+	COM_WRITE(1,0x00,temp,0,0,0,0);
+	
+	//Write TX addr(done in init)
+	//Write payload
+	COM_WRITE_PAYLOAD(payload);
+	//Step3:Pulse CE for 10 seconds
+	PORTC_OUTSET = 0x02;//set CE to be 1;
+	_delay_us(50);//min=10 us
+	PORTC_OUTCLR = 0x02;//set CE to be 0;
+	
+	//Check for ACK (TX_DS=1 is successful) in status register, If not received( TX_DS=0 and MAX_RT =1) flush payload and reset TX_DS and MAX_RT by writing 1.
+	do
+	{
+		status = COM_STATUS();//Read Status Register
+		temp=status & 0x30;
+		if(temp == 0x20){//TX_DS=1, YAY! Clear TX_DS.
+			wait=0;
+			temp= status | 0x20;//sets TX_DS=1 to clear
+			COM_WRITE(1,0x07,temp,0,0,0,0);
+			//COM_STATUS(status);//DEBUG:get status
+		}
+		else if(temp == 0x10){//MAX_RT=1 =(
+			//Ideally, input something to deal with this error. Instead, Flush payload and clear status
+			wait=0;
+			COM_FLUSH_TX();
+			temp= status | 0x10;//sets MAX_RT to 1
+			COM_WRITE(1,0x07,temp,0,0,0,0);
+			//COM_STATUS(status);//DEBUG:get status
+		}
+	} while (wait==1);
+	
+}
+
+void COM_RX_MODE(){//Enters RX mode, setup datapipe0
+	unsigned int temp;
+	unsigned int temp1,temp2,temp3,temp4,temp5;//DEBUG
+	//COM_READ(0x17);
+	//Set payload length in RX_PW_PX register
+	COM_WRITE(1,0x11,0x01,0,0,0,0);//Enables datapipe0, sets length to 8.
+	//Only use datapipe0
+	COM_WRITE(1,0x02,0x01,0,0,0,0);
+	//Ensure addr set properly, datapipe enabled(both done in init)
+	
+	//Set CONGIF bit PRIM_RX to 1. Set RX_IRQ enabled.
+	temp = COM_READ(0x00);
+	temp |= 0x01;
+	temp &= 0x3F;
+	//temp=0x3B;
+	COM_WRITE(1,0x00,temp,0,0,0,0);
+	
+	//DEBUG
+	//COM_STATUS(temp);
+	//COM_READ(0x11,temp);
+	//COM_READ(0x12,temp);
+	//COM_READ(0x00,temp);
+	//COM_READ(0x17,temp);
+	//COM_STATUS(temp);
+	//COM_READ_LARGE(5,0x0A,temp1,temp2,temp3,temp4,temp5);
+	//COM_READ_LARGE(5,0x10,temp1,temp2,temp3,temp4,temp5);
+	////COM_READ()
+	//COM_FLUSH_TX();
+	//COM_FLUSH_RX();
+	PORTC_OUTSET = 0x02;//set CE to be 1 This enters active RX mode.
+}
+
+void TIMER_CONFIG(){
+	unsigned int temp;
+	temp= GetNoteFreq(49);
+	TCC0_PER=0xFFFF;
+	TCC0_CCA=temp;
+	currentFreq=temp;
+	//TCC0_PER=160;// Value:Freq 3200:200, 440:1455 23703:27,160:4k for 50 samples
+	sei();
+	
+	PMIC_CTRL|=0x02;//enable medium interrupts. pg.100
+	TCC0_INTCTRLB=0x02;//set CompareIntrrupt A as medium
+	TCC0_INTCTRLA=0x02;//overflow interrupt set as medium priority. pg.138
+	//TCC0_CTRLB=0x10;//enable WG mode, no pin overrides.
+	//TCC0_CTRLA=0x01;// Prescale is clk/1, enables timer
+	
+	makeSineWave();
+}
+
+unsigned int GetNoteFreq(unsigned int noteID){
+	//const unsigned int clkFreq=32000000;
+	//const unsigned int preScaler=1;
+	//const unsigned int sampleNum = 50;
+	if(noteID > 88){
+		noteID =0;
+	}
+	unsigned int ret;
+	ret=(unsigned int)floor((clkFreq/preScaler)/((freqArray[noteID]*sampleNum)));
+	return ret;
+}
+
+void SoundPlay(){
+	unsigned int noteVal,countVal;
+	unsigned int temp;
+	/*16 bits: 
+	//7:0 determine note (e.x. decimal 81 would be encoded as 0x51
+	//11:8 determine note length, decimal 1 to 8. Length example:1 eight note is 1, 1 hole note is 8.
+	//
+	//using note length of zero will terminate sound. Using invalid note value (not between 0 and 88) will result in note being skipped.
+	*/	
+	
+
+		
+	noteVal=(unsigned int) (musicArray[musicArrayCount] & 0xFF);
+	countVal=(unsigned int)(musicArray[musicArrayCount]>>8);
+	musicArrayCount++;
+	if((countVal !=0)){//if count valid
+		if(noteVal<=88){
+			// Disable Touch Sensing ----------------------------------
+			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+			PORTA_INTCTRL = 0x00;	// Disable PORTA Interrupts
+			//--------------------------------------------------------
+			noteLength=countVal;
+			temp= GetNoteFreq(noteVal);
+			TCC0_CCA=temp;
+			currentFreq=temp;
+			TCC0_CTRLB=0x10;
+			TCC0_CTRLA=0x01;
+		}//end noteVal
+	}//END If count valid
+	else{
+		unsigned int outputData=0,temp2;
+	temp2=(0xF000 | (outputData<<2));
+	temp=(char)((temp2>>8));
+	//Start transmission
+	PORTD_OUTCLR = 0x10;//SS low
+	SPID_DATA =temp;
+	// Wait for transmission 1  to complete
+	while(!(SPID_STATUS & (1<<7)));
+	temp=(char)((temp2 & 0x00FF));
+	SPID_DATA =temp;
+	// Wait for transmission 2 to complete
+	while(!(SPID_STATUS & (1<<7)));
+	PORTD_OUTSET = 0x10;//SS high
+	
+	
+	//PORTC_OUTCLR=0x04;//DEBUG
+	musicArrayCount=0x00;
+	
+	touchSenseReset();
+	
+	}
+}
+
+ISR(PORTC_INT0_vect){//If payload recieved
+	unsigned int rxData;
+	rxData = COM_READ_PAYLOAD();
+	if(rxData != 0 ){
+		SoundPlay();
+	}
+	else{
+		musicArrayCount=7;
+		SoundPlay();
+	}
+	COM_FLUSH_RX();
+	
+	
+}
+
+ISR(TCC0_CCA_vect){
+	unsigned int outputData=0,temp2,temp, Vpp=1024;
+	outputData =  Vpp/100/2*sinArray[id1];
+	id1++;
+	TCC0_CTRLA=0x00;//pause timer
+	TCC0_CCA += currentFreq;//increment CCA
+	TCC0_CTRLA=0x01;//resume timer
+	//if(id1%2==0){
+	//	outputData=512;
+	//PORTC_OUTCLR =0x04;
+	//}
+	temp2=(0xF000 | (outputData<<2));
+	temp=(char)((temp2>>8));
+	//Start transmission
+	PORTD_OUTCLR = 0x10;//SS low
+	SPID_DATA =temp;
+	// Wait for transmission 1  to complete
+	while(!(SPID_STATUS & (1<<7)));
+	temp=(char)((temp2 & 0x00FF));
+	SPID_DATA =temp;
+	// Wait for transmission 2 to complete
+	while(!(SPID_STATUS & (1<<7)));
+	PORTD_OUTSET = 0x10;//SS high
+	
+	if(id1 >=50){
+		id1=0;
+	}
+}
+
+ISR(TCC0_OVF_vect){//ifv note done playing, stop. call back to function to determine next note info.
+	unsigned int temp;
+	subCount1++;
+	if(subCount1>=122*noteLength){//increment every 0.5 seconds hz(120 bpm base when prescale is 1)
+		//TCC0_CTRLA=0x00;
+		subCount1=0;
+		subCount3++;
+		//PORTC_OUTTGL =0x04;//DEBUG
+		if(subCount3>88){//change to 88? check array for missing values
+			subCount3=1;
+		}
+		//currentFreq= GetNoteFreq(subCount3);
+		//currentFreq=temp;
+		//TCC0_CCA=currentFreq;
+		//PMIC_CTRL=0x00;//enable medium interrupts. pg.100
+		TCC0_CTRLA=0x00;//disable timer.
+		//PMIC_CTRL=0x00;//enable medium interrupts. pg.100
+		TCC0_CTRLB=0x00;
+		SoundPlay();//Swap above lines with this.
+		//TCC0_CTRLA=0x01;
+	}
+}
+
+// ---------------------------------------------------------------------------

@@ -24,6 +24,26 @@ void vibrate(unsigned int);
 void vibrate_pulsed_start(unsigned int, unsigned int, unsigned char);
 void vibrate_pulsed_stop(void);
 
+// Frankie's Headers ----------------------------------------------------------------------------------------------------------
+void COM_WRITE(int ,unsigned int , unsigned int , unsigned int , unsigned int , unsigned int , unsigned int);
+unsigned int COM_STATUS(void);
+unsigned int COM_READ(unsigned int);
+void COM_FLUSH_TX();
+void COM_FLUSH_RX();
+void COM_RX_MODE();
+void COM_INIT();
+unsigned int COM_READ_PAYLOAD(void);
+void COM_WRITE_PAYLOAD(unsigned int);
+void COM_TX(unsigned int);
+//void COM_READ_LARGE(int numBytes, unsigned int regValue, unsigned int&,unsigned int&,unsigned int&,unsigned int&,unsigned int&);
+void clock_init();
+unsigned int GetNoteFreq(unsigned int);
+void SoundPlay(void);
+void SPID_init(void);
+void SPIC_init(void);
+void makeSineWave(void);
+void TIMER_CONFIG(void);
+// -----------------------------------------------------------------------------------
 
 #endif
 
