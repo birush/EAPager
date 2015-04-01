@@ -57,6 +57,7 @@
 #include "EAimages.h"
 #include "MazeGame.h"
 #include "EAPagerX1.h"
+#include "SnakeGame.h"
 
 volatile unsigned int adcValue = 0;
 volatile unsigned int xTouch=0, yTouch=0;
@@ -65,6 +66,10 @@ volatile unsigned char currentProgram = MAIN_MENU_ID;
 volatile unsigned char changingProgram = 0;
 volatile unsigned char vBCyclesLeft = 3;
 unsigned int debug, debug1;
+volatile unsigned char placeInLine = 255;
+volatile unsigned char PILChanged = 0;
+volatile unsigned int tempa=65000;
+
 
 const unsigned char LUT_RED_INC = 8;
 const unsigned char LUT_GREEN_INC = 4;
@@ -105,6 +110,7 @@ int main(void)
 	SPIC_init();
 	COM_INIT();
 	COM_RX_MODE();
+	
 
     while(1)
     {
@@ -118,6 +124,18 @@ int main(void)
 			touchSenseReset();
 			
 			while (!changingProgram) {
+				if (PILChanged) {
+					if (placeInLine > 9) {
+						unsigned char highDigit = placeInLine/10;
+						unsigned char lowDigit = placeInLine % 10;
+						tft_print_image(highDigit, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+						tft_print_image(lowDigit, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX+PIL_SPACING, PIL_STARTY);
+					}
+					else {
+						tft_print_image(placeInLine, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
+					}
+					PILChanged = 0;
+				}
 				debug1 = 5;
 			}
 		}
@@ -133,12 +151,19 @@ int main(void)
 
 //			vibrate(VB_HALF);			
 			vibrate_pulsed_start(VB_ONE, VB_EIGHTH, 5);
+			SoundPlay();
 			
 			while (!changingProgram) {
 				debug1 = 3;
 			}
 		}
 		///////////////////////////////////////////////////////////////////////////////////////
+		
+		// Snake Game ///////////////////////////////////////////////////////////////////////////////
+		else if (currentProgram == SNAKE_GAME_ID) {
+			playSnakeGame();
+		}
+		/////////////////////////////////////////////////////////////////////////////////////////////
 
     }
 
@@ -977,12 +1002,12 @@ void COM_RX_MODE(){//Enters RX mode, setup datapipe0
 	COM_WRITE(1,0x00,temp,0,0,0,0);
 	
 	//DEBUG
-	//COM_STATUS(temp);
-	//COM_READ(0x11,temp);
-	//COM_READ(0x12,temp);
-	//COM_READ(0x00,temp);
-	//COM_READ(0x17,temp);
-	//COM_STATUS(temp);
+	tempa = COM_STATUS();
+	tempa = COM_READ(0x11);
+	tempa = COM_READ(0x12);
+	tempa = COM_READ(0x00);
+	tempa = COM_READ(0x17);
+	tempa = COM_STATUS();
 	//COM_READ_LARGE(5,0x0A,temp1,temp2,temp3,temp4,temp5);
 	//COM_READ_LARGE(5,0x10,temp1,temp2,temp3,temp4,temp5);
 	////COM_READ()
@@ -1078,9 +1103,14 @@ ISR(PORTC_INT0_vect){//If payload recieved
 	unsigned int rxData;
 	rxData = COM_READ_PAYLOAD();
 	if(rxData != 0 ){
-		SoundPlay();
+		if (rxData != 0xFF) {
+			placeInLine = rxData;
+			PILChanged = 1;
+			//tft_print_square(200, 120, TFT_GREEN, 20);
+		}
 	}
 	else{
+		// We're being paged
 		musicArrayCount=7;
 		SoundPlay();
 	}
