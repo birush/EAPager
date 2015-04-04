@@ -10,6 +10,7 @@ void tft_write_data8(char);
 void setWindow(unsigned int, unsigned int, unsigned int, unsigned int);
 void tft_print_image(unsigned char, unsigned int, unsigned int, unsigned int, unsigned int);
 void tft_print_square(unsigned int, unsigned int, unsigned int, unsigned char);
+void tft_print_blank_background(unsigned int);
 void setWindow(unsigned int, unsigned int, unsigned int, unsigned int);
 void touchInit();
 void touchSenseInit();
@@ -45,195 +46,154 @@ void makeSineWave(void);
 void TIMER_CONFIG(void);
 // -----------------------------------------------------------------------------------
 
+volatile unsigned char currentProgram;
+volatile unsigned char changingProgram;
+unsigned int debug, debug1;
+
 #endif
+
+
+
+#ifndef EAPagerX1_Constants_H
+#define EAPagerX1_Constants_H
 
 //======= IMAGE CONSTANTS ========================
-#ifndef HS_BACKGROUND_IMAGE_ID
 #define HS_BACKGROUND_IMAGE_ID 255
-#endif
-
-#ifndef FULL_IMAGE_WIDTH
 #define FULL_IMAGE_WIDTH 400
-#endif
-
-#ifndef FULL_IMAGE_HEIGHT
 #define FULL_IMAGE_HEIGHT 240
-#endif
+
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 480
+#define SCREEN_WIDTH_END 799
+#define SCREEN_HEIGHT_END 479
 
 // Mazes Button //////////////////////
-#ifndef HS_MAZES_BUTTON_IMAGE_ID
 #define HS_MAZES_BUTTON_IMAGE_ID 254
-#endif
-
-#ifndef HS_MAZES_BUTTON_STARTX
 #define HS_MAZES_BUTTON_STARTX 48
-#endif
-
-#ifndef HS_MAZES_BUTTON_STARTY
 #define HS_MAZES_BUTTON_STARTY 68
-#endif
 /////////////////////////////////////
 
 // Snake Button /////////////////////
-#ifndef HS_SNAKE_BUTTON_IMAGE_ID
 #define HS_SNAKE_BUTTON_IMAGE_ID 253
-#endif
-
-#ifndef HS_SNAKE_BUTTON_STARTX
 #define HS_SNAKE_BUTTON_STARTX 248
-#endif
-
-#ifndef HS_SNAKE_BUTTON_STARTY
 #define HS_SNAKE_BUTTON_STARTY 68
-#endif
 /////////////////////////////////////
 
-#ifndef HS_BUTTON_IMAGE_WIDTH
-#define HS_BUTTON_IMAGE_WIDTH 104
-#endif
 
-#ifndef HS_BUTTON_IMAGE_HEIGHT
+#define HS_BUTTON_IMAGE_WIDTH 104
 #define HS_BUTTON_IMAGE_HEIGHT 104
-#endif
+
 
 // Main Menu Button //////////////////
-#ifndef MAIN_MENU_BUTTON_ID
 #define MAIN_MENU_BUTTON_ID 252
-#endif
-
-#ifndef MAIN_MENU_BUTTON_WIDTH
 #define MAIN_MENU_BUTTON_WIDTH 72
-#endif
-
-#ifndef MAIN_MENU_BUTTON_HEIGHT
 #define MAIN_MENU_BUTTON_HEIGHT 16
-#endif
-
-#ifndef MAIN_MENU_BUTTON_STARTX
 #define MAIN_MENU_BUTTON_STARTX 325
-#endif
-
-#ifndef MAIN_MENU_BUTTON_STARTY
 #define MAIN_MENU_BUTTON_STARTY 220
-#endif
+
 ///////////////////////////////////////
-
-#ifndef MAZE0_IMAGE_ID
 #define MAZE0_IMAGE_ID 10
-#endif
-
-#ifndef MAZE1_IMAGE_ID
 #define MAZE1_IMAGE_ID 11
-#endif
-
-#ifndef PIL_STARTX
 #define PIL_STARTX 245
-#endif
-
-#ifndef PIL_STARTY
 #define PIL_STARTY 210
-#endif
-
-#ifndef PIL_SPACING
 #define PIL_SPACING 14
-#endif
-
-#ifndef NUM0_ID
 #define NUM0_ID 0
-#endif
-
-#ifndef NUM1_ID
 #define NUM1_ID 1
-#endif
-
-#ifndef NUM2_ID
 #define NUM2_ID 2
-#endif
-
-#ifndef NUM3_ID
 #define NUM3_ID 3
-#endif
-
-#ifndef NUM4_ID
 #define NUM4_ID 4
-#endif
-
-#ifndef NUM5_ID
 #define NUM5_ID 5
-#endif
-
-#ifndef NUM6_ID
 #define NUM6_ID 6
-#endif
-
-#ifndef NUM7_ID
 #define NUM7_ID 7
-#endif
-
-#ifndef NUM8_ID
 #define NUM8_ID 8
-#endif
-
-#ifndef NUM9_ID
 #define NUM9_ID 9
-#endif
-
-#ifndef NUM_WIDTH
 #define NUM_WIDTH 16
-#endif
-
-#ifndef NUM_HEIGHT
 #define NUM_HEIGHT 16
-#endif
-
-
 // =================================
 
 //===== Game Constants ============
-#ifndef MAIN_MENU_ID
 #define MAIN_MENU_ID 0
-#endif
-
-#ifndef MAZE_GAME_ID
 #define MAZE_GAME_ID 1
-#endif
-
-#ifndef SNAKE_GAME_ID
 #define SNAKE_GAME_ID 2
-#endif
-
 //=================================
 
 // 16 bit Color Definitions =============
-#ifndef TFT_BLACK
 #define TFT_BLACK 0x0000
-#endif
-
-#ifndef TFT_WHITE
 #define TFT_WHITE 0xFFFF
-#endif
-
-#ifndef TFT_RED
 #define TFT_RED 0xF800
-#endif
-
-#ifndef TFT_GREEN
 #define TFT_GREEN 0x07E0
-#endif
-
-#ifndef TFT_BLUE
 #define TFT_BLUE 0x001F
-#endif
-
-#ifndef TFT_ORANGE
 #define TFT_ORANGE 0xFBE0
-#endif
-
-#ifndef TFT_HS_BACKGROUND_COLOR
-#define TFT_HS_BACKGROUND_COLOR 0x33FF
-#endif
-
-#ifndef TFT_HS_BUTTON_COLOR
-#define TFT_HS_BUTTON_COLOR 0x76EA
-#endif
+#define TFT_CASE_BLUE 0x039F
+#define TFT_HS_BACKGROUND_COLOR TFT_ORANGE//0x33FF
+#define TFT_HS_BUTTON_COLOR TFT_CASE_BLUE//0x76EA
 // ======================================
+
+// Timing Constants ---------------------------
+#define VB_ONE 31250
+#define VB_THREE_FOURTHS 23438
+#define VB_HALF 15625
+#define VB_THREE_EIGHTHS 11719
+#define VB_FOURTH 7813
+#define VB_EIGHTH 3906
+#define VB_SIXTEENTH 1953
+// --------------------------------------------
+#endif		// EAPagerX1_Constants_H
+
+
+
+#ifndef SNAKE_GAME_H_
+#define SNAKE_GAME_H_
+
+void playSnakeGame(void);
+void makeNewFood(void);
+unsigned int getRandCoord(unsigned int, unsigned char);
+
+#define UP 1
+#define RIGHT 2
+#define DOWN 3
+#define LEFT 4
+#define SPEED_NORMAL 15625
+#define X_COORD_TYPE 0
+#define Y_COORD_TYPE 1
+#define MIN_SNAKE_X_COORD 20
+#define MIN_SNAKE_Y_COORD 20
+#define MAX_SNAKE_X_COORD (FULL_IMAGE_WIDTH-MIN_SNAKE_X_COORD)
+#define MAX_SNAKE_Y_COORD (FULL_IMAGE_HEIGHT-MIN_SNAKE_Y_COORD)
+
+unsigned int foodSeed;
+
+typedef struct snakeNode snakeNode;
+struct snakeNode {
+	volatile unsigned int x;
+	volatile unsigned int y;
+	volatile unsigned char dir;
+	volatile unsigned char oldDir;
+	volatile snakeNode *nextSnakeNode;
+};
+
+typedef struct foodPiece foodPiece;
+struct foodPiece {
+	unsigned int x;
+	unsigned int y;
+};
+
+volatile snakeNode *head;
+volatile snakeNode *tail;
+volatile snakeNode *nextBend;
+volatile snakeNode *newestBend;
+volatile snakeNode *tempSnakeNode;
+
+foodPiece food;
+
+unsigned int startX;
+unsigned int startY;
+unsigned int gameSpeed;
+unsigned char blockSize;
+unsigned int backGroundColor;
+unsigned int snakeColor;
+unsigned int foodColor;
+unsigned int tailXOffset;
+
+
+#endif //SNAKE_GAME_H_

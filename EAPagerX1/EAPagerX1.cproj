@@ -145,9 +145,6 @@
     <Compile Include="EAPagerX1.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="SnakeGame.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="MazeGame.c">
       <SubType>compile</SubType>
     </Compile>

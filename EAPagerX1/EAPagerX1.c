@@ -12,17 +12,6 @@
 #define TFTWR ((char)0x20)
 // -------------------------------
 
-// 16 bit Color Definitions ------
-#define TFT_BLACK 0x0000
-#define TFT_WHITE 0xFFFF
-#define TFT_RED 0xF800
-#define TFT_GREEN 0x07E0
-#define TFT_BLUE 0x001F
-#define TFT_ORANGE 0xFBE0
-#define TFT_HS_BACKGROUND_COLOR 0x33FF
-#define TFT_HS_BUTTON_COLOR 0x76EA
-// -------------------------------
-
 // Touch Sensing Calibration ------------------
 #define ADC_X_OFFSET 510
 #define X_COORD_MAX 400
@@ -32,16 +21,6 @@
 #define Y_COORD_MAX 240
 #define ADC_Y_MAX_MAG 3000
 //#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
-// --------------------------------------------
-
-// Timing Constants ---------------------------
-#define VB_ONE 31250
-#define VB_THREE_FOURTHS 23438
-#define VB_HALF 15625
-#define VB_THREE_EIGHTHS 11719
-#define VB_FOURTH 7813
-#define VB_EIGHTH 3906
-#define VB_SIXTEENTH 1953
 // --------------------------------------------
 
 
@@ -57,15 +36,11 @@
 #include "EAimages.h"
 #include "MazeGame.h"
 #include "EAPagerX1.h"
-#include "SnakeGame.h"
 
 volatile unsigned int adcValue = 0;
 volatile unsigned int xTouch=0, yTouch=0;
 volatile unsigned long xTouchCoord, yTouchCoord;
-volatile unsigned char currentProgram = MAIN_MENU_ID;
-volatile unsigned char changingProgram = 0;
 volatile unsigned char vBCyclesLeft = 3;
-unsigned int debug, debug1;
 volatile unsigned char placeInLine = 255;
 volatile unsigned char PILChanged = 0;
 volatile unsigned int tempa=65000;
@@ -110,6 +85,9 @@ int main(void)
 	SPIC_init();
 	COM_INIT();
 	COM_RX_MODE();
+	
+	currentProgram = MAIN_MENU_ID;
+	changingProgram = 0;
 	
 
     while(1)
@@ -225,12 +203,23 @@ void vibrate_init() {
 void tft_print_square(unsigned int xCoord, unsigned int yCoord, unsigned int color, unsigned char size) {
 	unsigned int expandedXCoord = 2*xCoord;
 	unsigned int expandedYCoord	= 2*yCoord;
-	unsigned char endOffset = size-1;
+	unsigned char endOffset = (2*size)-1;
 	setWindow(expandedXCoord, expandedXCoord+endOffset, expandedYCoord, expandedYCoord+endOffset);
 	tft_write_command(0x2C);	//Begin RAMWR
-	unsigned int area = size*size;
+	unsigned int area = 4*size*size;
 	for (int i=0; i < area; i++) {
 		tft_write_data16(color);
+	}
+	//tft_write_command(0x00);
+}
+
+void tft_print_blank_background(unsigned int color) {	
+	setWindow(0, SCREEN_WIDTH_END, 0, SCREEN_HEIGHT_END);
+	tft_write_command(0x2C);	//Begin RAMWR
+	for (int i=0; i < SCREEN_HEIGHT; i++) {
+		for (int j=0; j < SCREEN_WIDTH; j++) {
+			tft_write_data16(color);
+		}
 	}
 	//tft_write_command(0x00);
 }
@@ -442,18 +431,25 @@ ISR(PORTA_INT0_vect) {
 	yTouchCoord -= (volatile unsigned long)ADC_Y_OFFSET;
 	yTouchCoord *= (volatile unsigned long)Y_COORD_MAX;
 	yTouchCoord /= (volatile unsigned long)ADC_Y_MAX_MAG;
-	tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 10);		// show where touch was
 	
 	switch (currentProgram) {
 		case MAIN_MENU_ID:
+			tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 5);		// show where touch was
 			if ((xTouchCoord > HS_MAZES_BUTTON_STARTX) && (xTouchCoord < (HS_MAZES_BUTTON_STARTX+HS_BUTTON_IMAGE_WIDTH))) {
 				if ((yTouchCoord > HS_MAZES_BUTTON_STARTY) && (yTouchCoord < (HS_SNAKE_BUTTON_STARTY+HS_BUTTON_IMAGE_HEIGHT))) {
 					currentProgram = 1;
 					changingProgram = 1;
 				}
 			}
+			else if ((xTouchCoord > HS_SNAKE_BUTTON_STARTX) && (xTouchCoord < (HS_SNAKE_BUTTON_STARTX+HS_BUTTON_IMAGE_WIDTH))) {
+				if ((yTouchCoord > HS_SNAKE_BUTTON_STARTY) && (yTouchCoord < (HS_SNAKE_BUTTON_STARTY+HS_BUTTON_IMAGE_HEIGHT))) {
+					currentProgram = 2;
+					changingProgram = 1;
+				}
+			}
 			break;
 		case MAZE_GAME_ID:
+			tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 5);		// show where touch was
 			if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
 				if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
 					currentProgram = 0;
@@ -461,6 +457,25 @@ ISR(PORTA_INT0_vect) {
 				}
 			}
 			break;
+		case SNAKE_GAME_ID:
+		if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
+			if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
+				currentProgram = 0;
+				changingProgram = 1;
+			}
+		}
+		else {
+			head->oldDir = head->dir;
+			if(head->dir == UP || head->dir == DOWN) {
+				if (xTouchCoord > 200) head->dir = RIGHT;
+				else head->dir = LEFT;
+			}
+			else {
+				if (yTouchCoord > 120) head->dir = DOWN;
+				else head->dir = UP;
+			}
+		}
+		break;
 	}
 	debug = 3;
 }
@@ -746,7 +761,7 @@ void clock_init() {
 
 void makeSineWave() {
 	int iii;
-	unsigned int temp;
+	//unsigned int temp;
 	double sinC[49];
 	//unsigned int sinArray[50];
 	for(iii=0;iii<50;iii++){//construct sinArray
@@ -986,7 +1001,7 @@ void COM_TX(unsigned int payload){//8 bit message, change to higher bit length d
 
 void COM_RX_MODE(){//Enters RX mode, setup datapipe0
 	unsigned int temp;
-	unsigned int temp1,temp2,temp3,temp4,temp5;//DEBUG
+	//unsigned int temp1,temp2,temp3,temp4,temp5;//DEBUG
 	//COM_READ(0x17);
 	//Set payload length in RX_PW_PX register
 	COM_WRITE(1,0x11,0x01,0,0,0,0);//Enables datapipe0, sets length to 8.
@@ -1149,7 +1164,7 @@ ISR(TCC0_CCA_vect){
 }
 
 ISR(TCC0_OVF_vect){//ifv note done playing, stop. call back to function to determine next note info.
-	unsigned int temp;
+	//unsigned int temp;
 	subCount1++;
 	if(subCount1>=122*noteLength){//increment every 0.5 seconds hz(120 bpm base when prescale is 1)
 		//TCC0_CTRLA=0x00;

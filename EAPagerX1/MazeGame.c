@@ -4,7 +4,7 @@
 
 unsigned char playMazeGame() {
 		
-	const unsigned char currentMaze = maze0;
+	//const unsigned char currentMaze = maze0;
 	//tft_print_image(currentMaze);
 	return 0;
 }
