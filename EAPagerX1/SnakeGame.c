@@ -3,60 +3,68 @@
 #include <stdlib.h>
 #include "EAPagerX1.h"
 #include "EAImages.h"
+#include <util/delay.h>
 //#include "SnakeGame.h"
 
 
 
 void playSnakeGame() {
 	// Initialize Some Game Parameters
-	startX = 100;
-	startY = 120;
-	gameSpeed = VB_FOURTH;
-	blockSize = 5;
+	SGStartX = 100;
+	SGStartY = 120;
+	snakeGameSpeed = VB_EIGHTH;
+	SGBlockSize = 5;
 	foodSeed = 100;
+	*snakeGameScore = 0;
 
 	// Initialize Game Timer
 	PMIC_CTRL |= 0x01;	// Enable Low level interrupts in PMIC
 	TCE0_CTRLB = 0x10;		// Normal counting mode, Enable CCA Only
 	TCE0_INTCTRLB = 0x01;	// CCA interrupt enabled at low priority
-	TCE0_PER = gameSpeed;	// Set Top
-	TCE0_CCA = gameSpeed;	// Set CCA	// Interrupt will occur at (gameSpeed * 32) us
+	TCE0_PER = snakeGameSpeed;	// Set Top
+	TCE0_CCA = snakeGameSpeed;	// Set CCA	// Interrupt will occur at (gameSpeed * 32) us
+	
+	// Start timer for seeding random number generator
+	TCD0_CTRLB = 0x00;		// Normal counting mode, no CCs enabled
+	TCD0_PER = 0xFFFF;		// Set period as high as possible
+	TCD0_CTRLA = 0x07;		// Start random number seed timer
 	
 	// Initialize head
 	//snakeNode firstHead;
-	head = (volatile snakeNode*)malloc(sizeof(snakeNode));
-	head->x = startX;
-	head->y = startY;
-	head->dir = RIGHT;
-	head->oldDir = RIGHT;
-	head->nextSnakeNode = NULL;
+	snakeHead = (volatile snakeNode*)malloc(sizeof(snakeNode));
+	snakeHead->x = SGStartX;
+	snakeHead->y = SGStartY;
+	snakeHead->dir = RIGHT;
+	snakeHead->oldDir = RIGHT;
+	snakeHead->nextSnakeNode = NULL;
 	
 	// Initialize tail
 	//snakeNode firstTail;
-	tail = (volatile snakeNode*)malloc(sizeof(snakeNode));
-	tail->x = startX-(4*blockSize);
-	tail->y = startY;
-	tail->dir = RIGHT;
-	tail->oldDir = RIGHT;
-	tail->nextSnakeNode = head;
+	snakeTail = (volatile snakeNode*)malloc(sizeof(snakeNode));
+	snakeTail->x = SGStartX-(4*SGBlockSize);
+	snakeTail->y = SGStartY;
+	snakeTail->dir = RIGHT;
+	snakeTail->oldDir = RIGHT;
+	snakeTail->nextSnakeNode = snakeHead;
 	
 	// Initialize colors
-	backGroundColor = TFT_CASE_BLUE;
-	snakeColor = TFT_ORANGE;
+	SGBackgroundColor = GAME_BACKGROUND_COLOR;
+	snakeColor = GAME_FOREGROUND_COLOR;
 	foodColor = TFT_GREEN;
 	
 	// Print background
+	tft_print_image(SG_BACKGROUND_IMAGE_ID, SGBackgroundColor, TFT_BLACK, 0, 0);
+	printDigits(SGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
+	tft_print_image(MAIN_MENU_BUTTON_ID, TFT_GREEN, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
 	
-	tft_print_blank_background(backGroundColor);
-	tft_print_image(MAIN_MENU_BUTTON_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
 	
 	// Initialize and print food
 	makeNewFood();
 	
 	// Print snake
 	int i;
-	for(i = tail->x; i <= head->x; i += blockSize) {
-		tft_print_square(i, head->y, snakeColor, blockSize);
+	for(i = snakeTail->x; i <= snakeHead->x; i += SGBlockSize) {
+		tft_print_square(i, snakeHead->y, snakeColor, SGBlockSize);
 	}
 	
 	changingProgram = 0;
@@ -66,101 +74,198 @@ void playSnakeGame() {
 	TCE0_CTRLA = 0x07;	// Start game timer at 31.25 kHz
 	
 	while (!changingProgram) {
-		//debug=6;
+		if (PILChanged) {
+			printDigits(SGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
+			PILChanged = 0;
+		}
 	}
 	
-	// Exit Game Release memory, clean up
-	while (tail->nextSnakeNode != NULL){
-		tempSnakeNode = tail->nextSnakeNode;
-		free((snakeNode*)tail);
-		tail = tempSnakeNode;
+	exitSnakeGame();
+	
+}
+
+void exitSnakeGame() {							// Release memory, clean up, go back to main menu
+	// Disable Touch Sensing
+	PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+	PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+	
+	// Stop and Disable Game Timer
+	TCE0_CTRLA = 0x00;	// Stop game timer
+	TCE0_CTRLB = 0x00;		// Disable CCA
+	TCE0_INTCTRLB = 0x00;	// Disable TCE0 interrupts
+	
+	// Print "Game Over" and score //////////
+	tft_print_image(SNAKE_GAME_OVER_ID, TFT_ORANGE, TFT_BLACK, SNAKE_GAME_OVER_STARTX, SNAKE_GAME_OVER_STARTY);
+	calculateDigits(snakeGameScore, SGSDigits);
+	printDigits(TFT_ORANGE, SGSDigits, SGS_STARTX, SGS_STARTY);
+	/////////////////////////////////////////
+		
+	while (snakeTail->nextSnakeNode != NULL){
+		tempSnakeNode = snakeTail->nextSnakeNode;
+		free((snakeNode*)snakeTail);
+		snakeTail = tempSnakeNode;
 	}
-	free((snakeNode*)tail);								// Free last node
+	free((snakeNode*)snakeTail);		// Free last node
+	
+	currentProgram = 0;			// Go to Main Menu
+	
+	for (int i=0; i < 2500; i++) {	// Give user time to see their score
+		_delay_ms(1);
+	}
 }
 
 // On Game Timer Interrupt
 ISR(TCE0_CCA_vect) {
-	if (head->dir != head->oldDir) {		//Snake turning, need to create new bend node
+	if (snakeHead->dir != snakeHead->oldDir) {		//Snake turning, need to create new bend node
 		
 		
-		tempSnakeNode = head;	// create new node pointer
+		tempSnakeNode = snakeHead;	// create new node pointer
 		//snakeNode newNode;
-		head = (volatile snakeNode*)malloc(sizeof(snakeNode));	// Create new node for head
-		head->dir = tempSnakeNode->dir;
-		head->oldDir = tempSnakeNode->dir;
-		head->x = tempSnakeNode->x;
-		head->y = tempSnakeNode->y;
-		head->nextSnakeNode = 0;
-		tempSnakeNode->nextSnakeNode = head;
-		newestBend = tempSnakeNode;
+		snakeHead = (volatile snakeNode*)malloc(sizeof(snakeNode));	// Create new node for head
+		snakeHead->dir = tempSnakeNode->dir;
+		snakeHead->oldDir = tempSnakeNode->dir;
+		snakeHead->x = tempSnakeNode->x;
+		snakeHead->y = tempSnakeNode->y;
+		snakeHead->nextSnakeNode = 0;
+		tempSnakeNode->nextSnakeNode = snakeHead;
+		newestSnakeBend = tempSnakeNode;
 	}
 	
-	switch(head->dir) {
+	switch(snakeHead->dir) {
 		case UP:
-			head->y-= blockSize;
+			snakeHead->y-= SGBlockSize;
 			break; 
 		case RIGHT:
-			head->x+= blockSize;
+			snakeHead->x+= SGBlockSize;
 			break;
 		case DOWN:
-			head->y+= blockSize;
+			snakeHead->y+= SGBlockSize;
 			break;
 		case LEFT:
-			head->x-= blockSize;
+			snakeHead->x-= SGBlockSize;
 			break;
 	}
 	
-	if (head->x == food.x && head->y == food.y) {
-		tft_print_square(head->x, head->y, snakeColor, blockSize);		// Print new head block
-		makeNewFood();
-	}
-	else {
-		tft_print_square(head->x, head->y, snakeColor, blockSize);		// Print new head block
-		tft_print_square(tail->x, tail->y, backGroundColor, blockSize);	// Erase tail block
-		switch(tail->dir) {												// Increment tail
+	// Check for collision with self /////////////////////////////////////////////////////////////////////
+	tempSnakeNode = snakeTail;
+	while (tempSnakeNode->nextSnakeNode != NULL){
+		switch(tempSnakeNode->dir) {
 			case UP:
-			tail->y -= blockSize;
+				if (snakeHead->x == tempSnakeNode->x) {
+					snakeSegEnd = tempSnakeNode->nextSnakeNode->y;
+					if (tempSnakeNode->nextSnakeNode == snakeHead) snakeSegEnd += SGBlockSize;	// Head being in same place as head isn't a collision
+					
+					if (snakeHead->y <= tempSnakeNode->y && snakeHead->y >= snakeSegEnd) {
+						changingProgram = 1;
+						return;
+					}
+				}
+				break;
+			case RIGHT:
+				snakeSegEnd = tempSnakeNode->nextSnakeNode->x;
+				if (tempSnakeNode->nextSnakeNode == snakeHead) snakeSegEnd -= SGBlockSize;	// Head being in same place as head isn't a collision
+				
+				if (snakeHead->y == tempSnakeNode->y) {
+					if (snakeHead->x >= tempSnakeNode->x && snakeHead->x <= snakeSegEnd) {
+						changingProgram = 1;
+						return;
+					}
+				}
+				break;
+			case DOWN:
+				snakeSegEnd = tempSnakeNode->nextSnakeNode->y;
+				if (tempSnakeNode->nextSnakeNode == snakeHead) snakeSegEnd -= SGBlockSize;	// Head being in same place as head isn't a collision
+				
+				if (snakeHead->x == tempSnakeNode->x) {
+					if (snakeHead->y >= tempSnakeNode->y && snakeHead->y <= snakeSegEnd) {
+						changingProgram = 1;
+						return;
+					}
+				}
+				break;
+			case LEFT:
+				snakeSegEnd = tempSnakeNode->nextSnakeNode->x;
+				if (tempSnakeNode->nextSnakeNode == snakeHead) snakeSegEnd += SGBlockSize;	// Head being in same place as head isn't a collision
+			
+				if (snakeHead->y == tempSnakeNode->y) {
+					if (snakeHead->x <= tempSnakeNode->x && snakeHead->x >= snakeSegEnd) {
+						changingProgram = 1;
+						return;
+					}
+				}
+				break;
+		}
+		
+		tempSnakeNode = tempSnakeNode->nextSnakeNode;
+	}
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	if (snakeHead->x > SNAKE_OOB_MAX_X || snakeHead->x < SNAKE_OOB_MIN_X || snakeHead->y > SNAKE_OOB_MAX_Y || snakeHead->y < SNAKE_OOB_MIN_Y){	// Check for Out of Bounds
+		changingProgram = 1;
+		return;
+	}
+	
+	else if (snakeHead->x == food.x && snakeHead->y == food.y) {					// Reached Food?
+		tft_print_square(snakeHead->x, snakeHead->y, snakeColor, SGBlockSize);		// Print new head block
+		makeNewFood();
+		(*snakeGameScore)++;
+	}
+	
+	else {
+		tft_print_square(snakeHead->x, snakeHead->y, snakeColor, SGBlockSize);		// Print new head block
+		tft_print_square(snakeTail->x, snakeTail->y, SGBackgroundColor, SGBlockSize);	// Erase tail block
+		switch(snakeTail->dir) {												// Increment tail
+			case UP:
+			snakeTail->y -= SGBlockSize;
 			break;
 			case RIGHT:
-			tail->x += blockSize;
+			snakeTail->x += SGBlockSize;
 			break;
 			case DOWN:
-			tail->y += blockSize;
+			snakeTail->y += SGBlockSize;
 			break;
 			case LEFT:
-			tail->x -= blockSize;
+			snakeTail->x -= SGBlockSize;
 			break;
 		}
 		
-		if (tail->x == tail->nextSnakeNode->x && tail->y == tail->nextSnakeNode->y) {	// If tail has reached a bend, free tail memory space
-			tempSnakeNode = tail->nextSnakeNode;
-			free((snakeNode*)tail);
-			tail = tempSnakeNode;
+		if (snakeTail->x == snakeTail->nextSnakeNode->x && snakeTail->y == snakeTail->nextSnakeNode->y) {	// If tail has reached a bend, free tail memory space
+			tempSnakeNode = snakeTail->nextSnakeNode;
+			free((snakeNode*)snakeTail);
+			snakeTail = tempSnakeNode;
 		}
 	}
 	
+	// Check for Collisions /////////////////////////////
+	
+	/////////////////////////////////////////////////////
 }
 
 void makeNewFood() {	// Change food position, print new food block
-	foodSeed = foodSeed + 131;
+	foodSeed = TCD0_CNT;
 	food.x = getRandCoord(foodSeed, X_COORD_TYPE);
 	food.y = getRandCoord(foodSeed, Y_COORD_TYPE);
-	tft_print_square(food.x, food.y, foodColor, blockSize);
+	tft_print_square(food.x, food.y, foodColor, SGBlockSize);
 }
 
 unsigned int getRandCoord(unsigned int seed, unsigned char coordType) {
 	unsigned long Xn = seed;
-	for (int i=0; i < 5; i++) {
+	for (int i=0; i < 2; i++) {
 		Xn = (16807*Xn) % 2147483647;
 	}
-	//Xn = Xn*10
 	
-	if (coordType) {
-		return Xn % MAX_SNAKE_Y_COORD;
+	if (coordType) {					// Y coordinate
+		Xn %= MAX_SNAKE_Y_COORD_DIV5;
+		Xn *= 5;
+		if (Xn < SNAKE_OOB_MIN_Y) Xn = SNAKE_OOB_MIN_Y;
 	}
-	else {
-		return Xn % MAX_SNAKE_X_COORD;
+	else {								// X coordinate
+		Xn %= MAX_SNAKE_X_COORD_DIV5;
+		Xn *= 5;
+		if (Xn < SNAKE_OOB_MIN_X) Xn = SNAKE_OOB_MIN_X;
 	}
+	
+	return (unsigned int)Xn;
 }
 
 

@@ -148,9 +148,6 @@
     <Compile Include="MazeGame.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="MazeGame.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="SnakeGame.c">
       <SubType>compile</SubType>
     </Compile>

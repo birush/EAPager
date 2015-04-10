@@ -26,23 +26,19 @@
 
 #define XAXIS ((char)0)
 #define YAXIS ((char)1)
-#define F_CPU 32000000
 
 #include <avr/io.h>
-#include <util/delay.h>
 #include <avr/pgmspace.h>
 #include <math.h>
 #include <avr/interrupt.h>
 #include "EAimages.h"
-#include "MazeGame.h"
 #include "EAPagerX1.h"
+#include <util/delay.h>
 
 volatile unsigned int adcValue = 0;
 volatile unsigned int xTouch=0, yTouch=0;
 volatile unsigned long xTouchCoord, yTouchCoord;
 volatile unsigned char vBCyclesLeft = 3;
-volatile unsigned char placeInLine = 255;
-volatile unsigned char PILChanged = 0;
 volatile unsigned int tempa=65000;
 
 
@@ -62,7 +58,8 @@ unsigned int subCount2=0,subCount3=1;
 unsigned long int subCount1=0,uberCount=0;
 
 //unsigned long int musicArray[4]={0x0400 | 49,0x0800| 1,0x0400|88,0};
-unsigned long int musicArray[12]={0x431,0x231,0x832,0x22D,0x22E,0x22F,0x230,0x12F,0x130,0x12F,0x130,0};
+//unsigned long int musicArray[12]={0x431,0x231,0x832,0x22D,0x22E,0x22F,0x230,0x12F,0x130,0x12F,0x130,0};
+unsigned long int musicArray[12]={0x844,0x23C,0x83D,0x23C,0x23D,0x23C,0x23D,0x13C,0x13D,0x13C,0x13D,0};
 unsigned int musicArrayCount=0;//Change datatype as required
 
 unsigned int sinArray[50],id1=0,id3=0;
@@ -88,7 +85,14 @@ int main(void)
 	
 	currentProgram = MAIN_MENU_ID;
 	changingProgram = 0;
-	
+	*placeInLine = 12;
+	PILChanged = 0;
+	touchDebounceDelay = 80;
+	currentMaze = 0;
+	calculateDigits(placeInLine, PILDigits); // DEBUGGING
+	//makeSineWave();
+	//SoundPlay();
+	//vibrate_pulsed_start(VB_ONE, VB_EIGHTH, 2);
 
     while(1)
     {
@@ -98,20 +102,13 @@ int main(void)
 			tft_print_image(HS_BACKGROUND_IMAGE_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
 			tft_print_image(HS_MAZES_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_MAZES_BUTTON_STARTX, HS_MAZES_BUTTON_STARTY);
 			tft_print_image(HS_SNAKE_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_SNAKE_BUTTON_STARTX, HS_SNAKE_BUTTON_STARTY);
+			printDigits(TFT_HS_BACKGROUND_COLOR, PILDigits, PIL_STARTX, PIL_STARTY);
 			changingProgram = 0;
 			touchSenseReset();
 			
 			while (!changingProgram) {
 				if (PILChanged) {
-					if (placeInLine > 9) {
-						unsigned char highDigit = placeInLine/10;
-						unsigned char lowDigit = placeInLine % 10;
-						tft_print_image(highDigit, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-						tft_print_image(lowDigit, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX+PIL_SPACING, PIL_STARTY);
-					}
-					else {
-						tft_print_image(placeInLine, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, PIL_STARTX, PIL_STARTY);
-					}
+					printDigits(TFT_HS_BACKGROUND_COLOR, PILDigits, PIL_STARTX, PIL_STARTY);
 					PILChanged = 0;
 				}
 				debug1 = 5;
@@ -121,19 +118,7 @@ int main(void)
 		
 		// Maze Game ///////////////////////////////////////////////////////////////////////////////
 		else if (currentProgram == MAZE_GAME_ID) {
-			// Program initialization
-			tft_print_image(MAZE0_IMAGE_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
-			tft_print_image(MAIN_MENU_BUTTON_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
-			changingProgram = 0;
-			touchSenseReset();
-
-//			vibrate(VB_HALF);			
-			vibrate_pulsed_start(VB_ONE, VB_EIGHTH, 5);
-			SoundPlay();
-			
-			while (!changingProgram) {
-				debug1 = 3;
-			}
+			playMazeGame();
 		}
 		///////////////////////////////////////////////////////////////////////////////////////
 		
@@ -145,6 +130,41 @@ int main(void)
 
     }
 
+}
+
+void printDigits(unsigned int backgroundColor, volatile unsigned char digits[3], unsigned int digitStartX, unsigned int digitStartY) {
+	if (digits[0] == 0) {
+		if (digits[1] != 0) {
+			tft_print_image(digits[1], backgroundColor, TFT_BLACK, digitStartX, digitStartY);
+			tft_print_image(digits[2], backgroundColor, TFT_BLACK, digitStartX+DIGIT_OFFSET1, digitStartY);
+		}
+		else {
+			tft_print_image(digits[2], backgroundColor, TFT_BLACK, digitStartX, digitStartY);
+		}
+	}
+	else {
+		tft_print_image(digits[0], backgroundColor, TFT_BLACK, digitStartX, digitStartY);
+		tft_print_image(digits[1], backgroundColor, TFT_BLACK, digitStartX+DIGIT_OFFSET1, digitStartY);
+		tft_print_image(digits[2], backgroundColor, TFT_BLACK, digitStartX+DIGIT_OFFSET2, digitStartY);
+	}
+}
+
+void calculateDigits(volatile unsigned char* number, volatile unsigned char digits[3])
+{
+	if (*number < 100) {
+		digits[0] = 0;
+		debug = *number/10;
+		digits[1] = debug;
+		debug = *number % 10;
+		digits[2] = debug;
+	}
+	
+	else {
+		digits[0] = *number/100;
+		digits[1] = *number % 100;
+		digits[2] = digits[1] % 10;
+		digits[1] = digits[1]/10;
+	}
 }
 
 void vibrate_pulsed_start(unsigned int onTime, unsigned int offTime, unsigned char numCycles) {
@@ -233,12 +253,20 @@ void tft_print_image(unsigned char imageId, unsigned int backgroundColor, unsign
 		width=NUM_WIDTH;
 		height=NUM_HEIGHT;	
 	}
-	else if((imageId >= MAZE0_IMAGE_ID && imageId <= MAZE1_IMAGE_ID) || imageId == HS_BACKGROUND_IMAGE_ID)
-	{
+	else if (imageId == HS_BACKGROUND_IMAGE_ID || imageId == SG_BACKGROUND_IMAGE_ID) {
 		width=FULL_IMAGE_WIDTH;
 		height=FULL_IMAGE_HEIGHT;
 	}
-	else if (imageId >= HS_SNAKE_BUTTON_IMAGE_ID && imageId <= HS_MAZES_BUTTON_IMAGE_ID) {
+	else if (imageId >= MAZE0_PATH_ID && imageId < MAZE0_IMAGE_ID) {
+		width = MAZEPATH_WIDTH;
+		height = MAZEPATH_HEIGHT;
+	}
+	else if(imageId >= MAZE0_IMAGE_ID)
+	{
+		width = MAZES_WIDTH;
+		height = MAZES_HEIGHT;
+	}
+	else if (imageId == HS_SNAKE_BUTTON_IMAGE_ID || imageId == HS_MAZES_BUTTON_IMAGE_ID) {
 		width=HS_BUTTON_IMAGE_WIDTH;
 		height=HS_BUTTON_IMAGE_HEIGHT;
 	}
@@ -246,6 +274,11 @@ void tft_print_image(unsigned char imageId, unsigned int backgroundColor, unsign
 	else if (imageId == MAIN_MENU_BUTTON_ID) {
 		width = MAIN_MENU_BUTTON_WIDTH;
 		height = MAIN_MENU_BUTTON_HEIGHT;
+	}
+	
+	else if (imageId == SNAKE_GAME_OVER_ID) {
+		width = SNAKE_GAME_OVER_WIDTH;
+		height = SNAKE_GAME_OVER_HEIGHT;
 	}
 	
 	else {
@@ -417,11 +450,19 @@ ISR(PORTA_INT0_vect) {
 	PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
 	PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
 	cli();
-	PORTB_OUTTGL = 0x40;	// Toggle Red LED
-	TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
-	PORTB_OUTSET = 0x20;	// LED1 ON
+	//PORTB_OUTTGL = 0x40;	// Toggle Red LED
+	//PORTB_OUTSET = 0x20;	// LED1 ON
 	PORTB_OUTCLR = 0x80;	// Disable ext pull up on XR
-	_delay_ms(80);
+
+	// Debouncing (shorter if in maze game)
+//	if (currentProgram == MAZE_GAME_ID) {
+//		_delay_ms(80);
+//	}
+//	else {
+		TCC1_CTRLA = 0x07;	// Start debounce timer at 31.25 kHz
+		_delay_ms(80);
+//	}
+
 	measureTouchCoordinates();
 	xTouchCoord = (volatile unsigned long)(xTouch & 0xFFF8);	// Discard lower 3 bits
 	xTouchCoord -= (volatile unsigned long)ADC_X_OFFSET;
@@ -449,35 +490,40 @@ ISR(PORTA_INT0_vect) {
 			}
 			break;
 		case MAZE_GAME_ID:
-			tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 5);		// show where touch was
 			if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
 				if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
-					currentProgram = 0;
 					changingProgram = 1;
+					return;
 				}
 			}
+			moveThroughMaze((volatile unsigned int)xTouchCoord, (volatile unsigned int)yTouchCoord);
 			break;
 		case SNAKE_GAME_ID:
-		if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
-			if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
-				currentProgram = 0;
-				changingProgram = 1;
+			if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
+				if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
+					changingProgram = 1;
+					return;
+				}
 			}
-		}
-		else {
-			head->oldDir = head->dir;
-			if(head->dir == UP || head->dir == DOWN) {
-				if (xTouchCoord > 200) head->dir = RIGHT;
-				else head->dir = LEFT;
+		
+			snakeHead->oldDir = snakeHead->dir;
+			if(snakeHead->dir == UP || snakeHead->dir == DOWN) {
+				if (xTouchCoord > snakeHead->x) snakeHead->dir = RIGHT;
+				else snakeHead->dir = LEFT;
 			}
 			else {
-				if (yTouchCoord > 120) head->dir = DOWN;
-				else head->dir = UP;
+				if (yTouchCoord > snakeHead->y) snakeHead->dir = DOWN;
+				else snakeHead->dir = UP;
 			}
-		}
-		break;
+		
+			break;
 	}
 	debug = 3;
+/*	
+	if (currentProgram == MAZE_GAME_ID) {
+		touchSenseReset();
+	}
+*/
 }
 
 // After Debouncing period, detect touches again
@@ -1119,14 +1165,18 @@ ISR(PORTC_INT0_vect){//If payload recieved
 	rxData = COM_READ_PAYLOAD();
 	if(rxData != 0 ){
 		if (rxData != 0xFF) {
-			placeInLine = rxData;
+			*placeInLine = rxData;
+			calculateDigits(placeInLine, PILDigits);
 			PILChanged = 1;
 			//tft_print_square(200, 120, TFT_GREEN, 20);
+			makeSineWave();
+			SoundPlay();
 		}
 	}
 	else{
 		// We're being paged
 		musicArrayCount=7;
+		makeSineWave();
 		SoundPlay();
 	}
 	COM_FLUSH_RX();
