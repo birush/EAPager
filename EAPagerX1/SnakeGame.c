@@ -9,13 +9,38 @@
 
 
 void playSnakeGame() {
+	inSnakeIntro = 1;
+	
 	// Initialize Some Game Parameters
 	SGStartX = 100;
 	SGStartY = 120;
 	snakeGameSpeed = VB_EIGHTH;
 	SGBlockSize = 5;
 	foodSeed = 100;
+	snakeGameScore = (volatile unsigned char*)malloc(sizeof(volatile unsigned char*));	// Allocate memory for snakeGameScore
 	*snakeGameScore = 0;
+	
+	// Initialize colors
+	SGBackgroundColor = GAME_BACKGROUND_COLOR;
+	snakeColor = GAME_FOREGROUND_COLOR;
+	foodColor = TFT_GREEN;
+
+	// Print Intro Screen /////////////////////////////////////////////////////////////////////////////////
+	tft_print_image(SG_INTRO_IMAGE_ID,SGBackgroundColor,TFT_BLACK,0,0);
+	tft_print_image(OK_BUTTON_RC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_RC_STARTX, OK_BUTTON_RC_STARTY);
+	
+/*	tft_print_image(SG_INTRO_IMAGE_ID,SGBackgroundColor,TFT_BLACK,0,0);
+	for (int i=SG_INTRO_HS_STARTX; i < SG_INTRO_HS_ENDX; i += SG_INTRO_S_WIDTH) {
+		tft_print_square(i,SG_INTRO_HS_STARTY, snakeColor, SG_INTRO_S_WIDTH);
+	}
+	for (int i=SG_INTRO_VS_STARTY; i < SG_INTRO_VS_ENDY; i += SG_INTRO_S_WIDTH) {
+		tft_print_square(SG_INTRO_VS_STARTX,i, snakeColor, SG_INTRO_S_WIDTH);
+	}
+	tft_print_image(OK_BUTTON_BC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_BC_STARTX, OK_BUTTON_BC_STARTY);
+	*/
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
+	changingProgram = 0;
+	touchSenseReset();
 
 	// Initialize Game Timer
 	PMIC_CTRL |= 0x01;	// Enable Low level interrupts in PMIC
@@ -24,11 +49,11 @@ void playSnakeGame() {
 	TCE0_PER = snakeGameSpeed;	// Set Top
 	TCE0_CCA = snakeGameSpeed;	// Set CCA	// Interrupt will occur at (gameSpeed * 32) us
 	
-	// Start timer for seeding random number generator
+/*	// Start timer for seeding random number generator
 	TCD0_CTRLB = 0x00;		// Normal counting mode, no CCs enabled
-	TCD0_PER = 0xFFFF;		// Set period as high as possible
+	TCD0_PER = VB_TWO;		// Set period to 2 s (almost full capacity)
 	TCD0_CTRLA = 0x07;		// Start random number seed timer
-	
+*/	
 	// Initialize head
 	//snakeNode firstHead;
 	snakeHead = (volatile snakeNode*)malloc(sizeof(snakeNode));
@@ -47,10 +72,10 @@ void playSnakeGame() {
 	snakeTail->oldDir = RIGHT;
 	snakeTail->nextSnakeNode = snakeHead;
 	
-	// Initialize colors
-	SGBackgroundColor = GAME_BACKGROUND_COLOR;
-	snakeColor = GAME_FOREGROUND_COLOR;
-	foodColor = TFT_GREEN;
+	// Wait till user is done with intro to start game
+	while (inSnakeIntro) {
+		
+	}
 	
 	// Print background
 	tft_print_image(SG_BACKGROUND_IMAGE_ID, SGBackgroundColor, TFT_BLACK, 0, 0);
@@ -67,9 +92,6 @@ void playSnakeGame() {
 		tft_print_square(i, snakeHead->y, snakeColor, SGBlockSize);
 	}
 	
-	changingProgram = 0;
-	touchSenseReset();
-	
 	// Start Game
 	TCE0_CTRLA = 0x07;	// Start game timer at 31.25 kHz
 	
@@ -77,6 +99,94 @@ void playSnakeGame() {
 		if (PILChanged) {
 			printDigits(SGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
 			PILChanged = 0;
+		}
+		
+		if (tableReady) {
+			// Disable Touch Sensing
+			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+			PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+			
+			TCE0_CTRLA = 0x00;	// Stop game timer
+			//TCD0_CTRLA = 0x00;	// Stop random number seed timer
+			
+			tableReadyMessage();
+		}
+		
+		if (pagingUser) {
+			// Disable Touch Sensing
+			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+			PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+			
+			TCE0_CTRLA = 0x00;	// Stop game timer
+			//TCD0_CTRLA = 0x00;	// Stop random number seed timer
+			
+			pageUser();
+		}
+		
+		if (outOfRange) {
+			// Disable Touch Sensing
+			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+			PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+			
+			TCE0_CTRLA = 0x00;	// Stop game timer
+			//TCD0_CTRLA = 0x00;	// Stop random number seed timer
+			
+			timeSincePing = 0;
+			showOORMessage();
+		}
+		
+		if (resumingProgram) {
+			currentProgram = SNAKE_GAME_ID;
+			
+			// Reprint background Stuff
+			tft_print_image(SG_BACKGROUND_IMAGE_ID, SGBackgroundColor, TFT_BLACK, 0, 0);
+			printDigits(SGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
+			tft_print_image(MAIN_MENU_BUTTON_ID, TFT_GREEN, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
+			
+			//Reprint Food
+			tft_print_square(food.x, food.y, foodColor, SGBlockSize);
+			
+			//Reprint Snake
+			// Reprint user trail ////////////////////////////////////////////////////////////////////////////////////////////
+			tempSnakeNode = snakeTail;
+			while (tempSnakeNode != snakeHead) {
+				switch(tempSnakeNode->dir) {		// Print every square in this snake segment
+					case UP:
+					segFixedCoord = tempSnakeNode->x;	// x coord doesn't change on this segment
+					for (int i=tempSnakeNode->y; i > tempSnakeNode->nextSnakeNode->y; i -= SGBlockSize) {
+						tft_print_square(segFixedCoord, i, snakeColor, SGBlockSize);
+					}
+					break;
+					case DOWN:
+					segFixedCoord = tempSnakeNode->x;	// x coord doesn't change on this segment
+					for (int i=tempSnakeNode->y; i < tempSnakeNode->nextSnakeNode->y; i += SGBlockSize) {
+						tft_print_square(segFixedCoord, i, snakeColor, SGBlockSize);
+					}
+					break;
+					case RIGHT:
+					segFixedCoord = tempSnakeNode->y;	// y coord doesn't change on this segment
+					for (int i=tempSnakeNode->x; i < tempSnakeNode->nextSnakeNode->x; i += SGBlockSize) {
+						tft_print_square(i, segFixedCoord, snakeColor, SGBlockSize);
+					}
+					break;
+					case LEFT:
+					segFixedCoord = tempSnakeNode->y;	// y coord doesn't change on this segment
+					for (int i=tempSnakeNode->x; i > tempSnakeNode->nextSnakeNode->x; i -= SGBlockSize) {
+						tft_print_square(i, segFixedCoord, snakeColor, SGBlockSize);
+					}
+					break;
+				}
+				tempSnakeNode = tempSnakeNode->nextSnakeNode;	// increment to next bend/segment
+			}
+			tft_print_square(snakeHead->x, snakeHead->y, snakeColor, SGBlockSize);	// Print head
+			//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			
+			resumingProgram = 0;
+			touchSenseReset();
+			
+			// Restart Timers
+			TCE0_CTRLA = 0x07;	// Start game timer
+			//TCD0_CTRLA = 0x07;	// Start random number seed timer
 		}
 	}
 	
@@ -89,15 +199,18 @@ void exitSnakeGame() {							// Release memory, clean up, go back to main menu
 	PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
 	PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
 	
-	// Stop and Disable Game Timer
+	// Stop and Disable Timers
 	TCE0_CTRLA = 0x00;	// Stop game timer
 	TCE0_CTRLB = 0x00;		// Disable CCA
 	TCE0_INTCTRLB = 0x00;	// Disable TCE0 interrupts
+	//TCD0_CTRLA = 0x00;	// Stop random number seed timer
+
 	
 	// Print "Game Over" and score //////////
-	tft_print_image(SNAKE_GAME_OVER_ID, TFT_ORANGE, TFT_BLACK, SNAKE_GAME_OVER_STARTX, SNAKE_GAME_OVER_STARTY);
+	tft_print_image(SNAKE_GAME_OVER_ID, snakeColor, TFT_BLACK, SNAKE_GAME_OVER_STARTX, SNAKE_GAME_OVER_STARTY);
 	calculateDigits(snakeGameScore, SGSDigits);
-	printDigits(TFT_ORANGE, SGSDigits, SGS_STARTX, SGS_STARTY);
+	printDigits(snakeColor, SGSDigits, SGS_STARTX, SGS_STARTY);
+	playSong(GAMEOVER_SONG_ID,0,0);
 	/////////////////////////////////////////
 		
 	while (snakeTail->nextSnakeNode != NULL){
@@ -106,6 +219,7 @@ void exitSnakeGame() {							// Release memory, clean up, go back to main menu
 		snakeTail = tempSnakeNode;
 	}
 	free((snakeNode*)snakeTail);		// Free last node
+	free((unsigned char*)snakeGameScore);	// Free snakeGameScore
 	
 	currentProgram = 0;			// Go to Main Menu
 	
@@ -200,16 +314,20 @@ ISR(TCE0_CCA_vect) {
 	}
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
-	if (snakeHead->x > SNAKE_OOB_MAX_X || snakeHead->x < SNAKE_OOB_MIN_X || snakeHead->y > SNAKE_OOB_MAX_Y || snakeHead->y < SNAKE_OOB_MIN_Y){	// Check for Out of Bounds
+	// Check for Out of Bounds//////////////////////////////////////
+	if (snakeHead->x > SNAKE_OOB_MAX_X || snakeHead->x < SNAKE_OOB_MIN_X || snakeHead->y > SNAKE_OOB_MAX_Y || snakeHead->y < SNAKE_OOB_MIN_Y){	
 		changingProgram = 1;
 		return;
 	}
+	//////////////////////////////////////////////////////////////////
 	
-	else if (snakeHead->x == food.x && snakeHead->y == food.y) {					// Reached Food?
+	// Reached Food? /////////////////////////////////////////////////////
+	else if (snakeHead->x == food.x && snakeHead->y == food.y) {					
 		tft_print_square(snakeHead->x, snakeHead->y, snakeColor, SGBlockSize);		// Print new head block
 		makeNewFood();
 		(*snakeGameScore)++;
 	}
+	/////////////////////////////////////////////////////////////////////
 	
 	else {
 		tft_print_square(snakeHead->x, snakeHead->y, snakeColor, SGBlockSize);		// Print new head block
@@ -235,10 +353,6 @@ ISR(TCE0_CCA_vect) {
 			snakeTail = tempSnakeNode;
 		}
 	}
-	
-	// Check for Collisions /////////////////////////////
-	
-	/////////////////////////////////////////////////////
 }
 
 void makeNewFood() {	// Change food position, print new food block

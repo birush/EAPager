@@ -23,7 +23,6 @@
 //#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
 // --------------------------------------------
 
-
 #define XAXIS ((char)0)
 #define YAXIS ((char)1)
 
@@ -31,6 +30,7 @@
 #include <avr/pgmspace.h>
 #include <math.h>
 #include <avr/interrupt.h>
+#include <stdlib.h>
 #include "EAimages.h"
 #include "EAPagerX1.h"
 #include <util/delay.h>
@@ -56,16 +56,48 @@ unsigned int noteLength=8;
 unsigned int currentFreq=0;
 unsigned int subCount2=0,subCount3=1;
 unsigned long int subCount1=0,uberCount=0;
+unsigned int currentSongStartIndex;
+unsigned char currentSongLoop, songPlaying;
+unsigned int currentSongSecondsLeft;
+unsigned char silentNote;
+unsigned int unitNumber;
+unsigned char loopsLeft;
+
+
+
+
 
 //unsigned long int musicArray[4]={0x0400 | 49,0x0800| 1,0x0400|88,0};
 //unsigned long int musicArray[12]={0x431,0x231,0x832,0x22D,0x22E,0x22F,0x230,0x12F,0x130,0x12F,0x130,0};
-unsigned long int musicArray[12]={0x844,0x23C,0x83D,0x23C,0x23D,0x23C,0x23D,0x13C,0x13D,0x13C,0x13D,0};
+unsigned long int musicArray[149]=
+{
+	/*TRILL*/0x1044,0x103C,0x103D,0x103C,0x103D,0x103C,0x103D,0x83C,0x83D,0x83C,0x83D,0,/*WT_INTRO*/0x63D,0x13D,
+	0x13D,0x63D,0x13D,0x13D,0x23D,0x23A,0x236,0x23A,0x23D,0x23A,0x23D,0x236,0x23D,0x23A,
+	0x236,0x23A,0x23D,0x23A,0x3D,0x236,0xE3D,0,/*WT_VERSE*/0x831,0x100,0x831,0x100,0x1031,0x100,
+	0x831,0x100,0x831,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1036,0x100,0x1038,0x100,0x103A,
+	0x100,0x831,0x100,0x831,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1036,0x100,0x83A,0x100,
+	0x83A,0x100,0x1038,0x100,0x1035,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1031,0x100,0x831,
+	0x100,0x831,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1036,0x100,0x1038,0x100,0x103A,0x100,
+	0x836,0x100,0x83A,0x100,0x283D,0x100,0x83B,0x100,0x83A,0x100,0x838,0x100,0x1036,0x100,0x103A,
+	0x100,0x1036,0x2000,0,/*ALERT*/0x844,0x845,0x846,0x847,0x848,0,/*ATTN*/0x2042,0x2046,0x2049,0,
+	/*GAMEOVER*/0x103D,0x100,0x103C,0x100,0x103B,0x100,0x403A,0x100,0,/*SUCCESS*/0x203B,0x100,0x103B,0x100,0x103B,0x100,0x4042,0x100,0
+};
 unsigned int musicArrayCount=0;//Change datatype as required
 
 unsigned int sinArray[50],id1=0,id3=0;
 unsigned long int id2=0;//DEBUG
 //const double freqArray[88]={0,27.5,29.135,32.703,34.648,36.708,38.891,41.204,43.654,46.250,49.000,51.913,55,58.270,61.735,65.406,69.296,73.416,77.782,82.407,87.307,92.499,97.999,103.826,110,116.541,123.471,130.813,138.591,146.832,155.563,164.814,174.614,184.997,195.998,207.652,220,233.082,246.942,261.626,277.183,293.665,311.127,329.628,349.228,369.994,391.995,415.305,440,466.164,493.883,523.251,554.365,587.330,622.254,659.255,698.456,739.989,783.991,830.609,880,932.328,987.767,1046.5,1108.73,1174.66,1244.51,1318.51,1396.91,1479.98,1567.98,1661.22,1760,1864,1975.53,2093,2217.46,2349.32,2489.02,2637.02,2793.83,2959.96,3135.96,3322.44,3520,3729.31,3951.07,4186.01};
-const double freqArray[89]={0,27.5,29.135,30.87,32.703,34.648,36.708,38.891,41.204,43.654,46.250,49.000,51.913,55,58.270,61.735,65.406,69.296,73.416,77.782,82.407,87.307,92.499,97.999,103.826,110,116.541,123.471,130.813,138.591,146.832,155.563,164.814,174.614,184.997,195.998,207.652,220,233.082,246.942,261.626,277.183,293.665,311.127,329.628,349.228,369.994,391.995,415.305,440,466.164,493.883,523.251,554.365,587.330,622.254,659.255,698.456,739.989,783.991,830.609,880,932.328,987.767,1046.5,1108.73,1174.66,1244.51,1318.51,1396.91,1479.98,1567.98,1661.22,1760,1864,1975.53,2093,2217.46,2349.32,2489.02,2637.02,2793.83,2959.96,3135.96,3322.44,3520,3729.31,3951.07,4186.01};
+const double freqArray[89]=
+{
+	0,27.5,29.135,30.87,32.703,34.648,36.708,38.891,41.204,43.654,46.250,49.000,51.913,
+	55,58.270,61.735,65.406,69.296,73.416,77.782,82.407,87.307,92.499,97.999,103.826,
+	110,116.541,123.471,130.813,138.591,146.832,155.563,164.814,174.614,184.997,195.998,
+	207.652,220,233.082,246.942,261.626,277.183,293.665,311.127,329.628,349.228,369.994,
+	391.995,415.305,440,466.164,493.883,523.251,554.365,587.330,622.254,659.255,698.456,
+	739.989,783.991,830.609,880,932.328,987.767,1046.5,1108.73,1174.66,1244.51,1318.51,
+	1396.91,1479.98,1567.98,1661.22,1760,1864,1975.53,2093,2217.46,2349.32,2489.02,2637.02,
+	2793.83,2959.96,3135.96,3322.44,3520,3729.31,3951.07,4186.01
+};
 // --------------------------------------------------------------------------
 
 
@@ -74,6 +106,15 @@ int main(void)
 	clock_init();
 	//PORTB_DIRSET = 0x60;	// Enable LED ports
 	//PORTB_OUTTGL = 0x40;
+	
+	#ifdef BLUE1
+	unitNumber = 1;
+	#endif
+
+	#ifdef ORANGE2
+	unitNumber = 2;
+	#endif
+	
 	tft_init();
 	touchInit();
 	vibrate_init();
@@ -85,14 +126,41 @@ int main(void)
 	
 	currentProgram = MAIN_MENU_ID;
 	changingProgram = 0;
-	*placeInLine = 12;
+	resumingProgram = 0;
+	pagingUser = 0;
+	outOfRange = 0;
+	tableReady = 0;
+	placeInLine = (volatile unsigned char*)malloc(sizeof(volatile unsigned char*));
+	*placeInLine = 250;
 	PILChanged = 0;
 	touchDebounceDelay = 80;
 	currentMaze = 0;
+	currentSongLoop = 0;
+	songPlaying = 0;
+	soundOn = 0;
+	silentNote = 0;
+	loopsLeft = 0;
+	//unitNumber = 1;
 	calculateDigits(placeInLine, PILDigits); // DEBUGGING
-	//makeSineWave();
-	//SoundPlay();
+	makeSineWave();
+	//playSong(WTVERSE_SONG_ID, 1, 30);
 	//vibrate_pulsed_start(VB_ONE, VB_EIGHTH, 2);
+	
+	// Initialize OOR Timer ///////////////////////
+	timeSincePing = 0;
+	PMIC_CTRL |= 0x01;		// Enable Low level interrupts in PMIC
+	TCD0_CTRLB = 0x10;			// Normal counting mode, Enable CCA Only
+	#ifdef HAVE_BASE
+	TCD0_INTCTRLB = 0x01;		// CCA interrupt enabled at low priority
+	#endif
+	TCD0_PER = VB_TWO;			// Set Top
+	TCD0_CCA = VB_TWO;			// Set CCA	
+	TCD0_CTRLA = 0x07;			// Start OOR timer
+	//////////////////////////////////////////
+	
+	//playSong(ATTN_SONG_ID,1,4);
+	//_delay_ms(5000);
+	//playSong(GAMEOVER_SONG_ID,0,1);
 
     while(1)
     {
@@ -106,12 +174,56 @@ int main(void)
 			changingProgram = 0;
 			touchSenseReset();
 			
+//			playSong(WTVERSE_SONG_ID, 0, 10);
+/*			while (songPlaying) {
+				debug1 = 3;
+			}
+			playSong(WTVERSE_SONG_ID, 0, 0);
+*/
+			
 			while (!changingProgram) {
 				if (PILChanged) {
 					printDigits(TFT_HS_BACKGROUND_COLOR, PILDigits, PIL_STARTX, PIL_STARTY);
 					PILChanged = 0;
 				}
-				debug1 = 5;
+				
+				if (tableReady) {
+					// Disable Touch Sensing
+					PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+					PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+					
+					tableReadyMessage();
+				}
+				
+				if (pagingUser) {
+					// Disable Touch Sensing
+					PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+					PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+					
+					pageUser();
+				}
+				
+				if (outOfRange) {
+					// Disable Touch Sensing
+					PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+					PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+					
+					timeSincePing = 0;
+					showOORMessage();
+				}
+				
+				if (resumingProgram) {
+					currentProgram = MAIN_MENU_ID;
+					
+					// Reprint Main Menu Screen //////////////////////////////
+					tft_print_image(HS_BACKGROUND_IMAGE_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
+					tft_print_image(HS_MAZES_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_MAZES_BUTTON_STARTX, HS_MAZES_BUTTON_STARTY);
+					tft_print_image(HS_SNAKE_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_SNAKE_BUTTON_STARTX, HS_SNAKE_BUTTON_STARTY);
+					printDigits(TFT_HS_BACKGROUND_COLOR, PILDigits, PIL_STARTX, PIL_STARTY);
+					resumingProgram = 0;
+					touchSenseReset();
+					//////////////////////////////////////////////////////////
+				}
 			}
 		}
 		////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,25 +233,137 @@ int main(void)
 			playMazeGame();
 		}
 		///////////////////////////////////////////////////////////////////////////////////////
-		
+
 		// Snake Game ///////////////////////////////////////////////////////////////////////////////
 		else if (currentProgram == SNAKE_GAME_ID) {
 			playSnakeGame();
 		}
 		/////////////////////////////////////////////////////////////////////////////////////////////
-
+/*
+		// Table Ready ///////////////////////////////////////////////////////////////////////////////
+		else if (currentProgram == TABLE_READY_PG_ID) {
+			tft_print_blank_background(TFT_HS_BACKGROUND_COLOR);
+			tft_print_image(TABLE_READY_IMAGE_ID, GAME_BACKGROUND_COLOR, TFT_BLACK, TABLE_READY_STARTX, TABLE_READY_STARTY);
+			tft_print_image(OK_BUTTON_BC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_BC_STARTX, OK_BUTTON_BC_STARTY);
+			
+			vibrate_pulsed_start(VB_FOURTH, VB_EIGHTH, 20);
+			playSong(WTVERSE_SONG_ID,1, 60);
+			changingProgram = 0;
+			touchSenseReset();
+			
+			while (!changingProgram) {
+				tft_print_image(TABLE_READY_IMAGE_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, TABLE_READY_STARTX, TABLE_READY_STARTY);
+				//_delay_ms(100);
+				tft_print_image(TABLE_READY_IMAGE_ID, GAME_BACKGROUND_COLOR, TFT_BLACK, TABLE_READY_STARTX, TABLE_READY_STARTY);
+			}
+			
+		}
+		////////////////////////////////////////////////////////////////////////////////////////////
+*/
     }
 
 }
 
-void printDigits(unsigned int backgroundColor, volatile unsigned char digits[3], unsigned int digitStartX, unsigned int digitStartY) {
+void tableReadyMessage() {
+	currentProgram = TABLE_READY_PG_ID;
+	tft_print_blank_background(TFT_HS_BACKGROUND_COLOR);
+	tft_print_image(TABLE_READY_IMAGE_ID, GAME_BACKGROUND_COLOR, TFT_BLACK, TABLE_READY_STARTX, TABLE_READY_STARTY);
+	tft_print_image(OK_BUTTON_BC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_BC_STARTX, OK_BUTTON_BC_STARTY);
+	
+	vibrate_pulsed_start(VB_FOURTH, VB_EIGHTH, 20);
+	playSong(WTVERSE_SONG_ID,1, 10);
+	touchSenseReset();
+	
+	while (!resumingProgram) {
+		tft_print_image(TABLE_READY_IMAGE_ID, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, TABLE_READY_STARTX, TABLE_READY_STARTY);
+		_delay_ms(100);
+		tft_print_image(TABLE_READY_IMAGE_ID, GAME_FOREGROUND_COLOR, TFT_BLACK, TABLE_READY_STARTX, TABLE_READY_STARTY);
+	}
+}
+
+void pageUser() {
+	currentProgram = PAGING_USER_PG_ID;
+	tft_print_image(PAGING_USER_IMAGE_ID, GAME_BACKGROUND_COLOR, TFT_BLACK, PAGING_USER_STARTX, PAGING_USER_STARTY);
+	tft_print_image(OK_BUTTON_BC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_BC_STARTX, OK_BUTTON_BC_STARTY);
+	
+	vibrate_pulsed_start(VB_THREE_FOURTHS, VB_EIGHTH, 20);
+	playSong(ATTN_SONG_ID,1, 20);
+	touchSenseReset();
+	
+	while (!resumingProgram) {
+
+	}
+}
+
+void showOORMessage() {
+	currentProgram = OOR_PG_ID;
+	tft_print_image(OOR_IMAGE_ID, GAME_BACKGROUND_COLOR, TFT_BLACK, OOR_STARTX, OOR_STARTY);
+	tft_print_image(OK_BUTTON_BC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_BC_STARTX, OK_BUTTON_BC_STARTY);
+	
+	//vibrate_pulsed_start(VB_THREE_FOURTHS, VB_EIGHTH, 20);
+	playSong(ALERT_SONG_ID,1, 20);
+	touchSenseReset();
+	
+	while (!resumingProgram) {
+
+	}
+}
+
+void playSong(unsigned int songId, unsigned char loopOn, unsigned char numLoops) {
+	soundOn = 1;
+	musicArrayCount = songId;
+	currentSongStartIndex = songId;
+	currentSongLoop = loopOn;
+
+	if (loopOn) {
+		loopsLeft = numLoops;
+/*
+		currentSongSecondsLeft = durationS;
+		PMIC_CTRL |= 0x01;		// Enable Low level interrupts in PMIC
+		TCD0_CTRLB = 0x10;			// Normal counting mode, Enable CCA Only
+		TCD0_INTCTRLB = 0x01;		// CCA interrupt enabled at low priority
+		tcd0_prevPER = TCD0_PER;	// Save old per
+		tcd0_prevCTRLA = TCD0_CTRLA;	// save old on state and speed
+		TCD0_PER = VB_ONE;			// Set Top
+		TCD0_CCA = VB_ONE;			// Set CCA	// Interrupt will occur at (duration32us * 32) us
+		TCD0_CTRLA = 0x07;			// Start song duration timer
+*/
+	}
+	soundPlay();
+}
+
+ISR(TCD0_CCA_vect) {
+	timeSincePing +=2;
+	if (timeSincePing > 12) {
+		outOfRange = 1;
+	}
+
+/*
+	if (--currentSongSecondsLeft == 0) {
+		soundStop();
+		TCD0_PER = tcd0_prevPER;
+		TCD0_CTRLA = tcd0_prevCTRLA;
+		TCE0_CTRLB = 0x00;		// Disable CCA
+		TCE0_INTCTRLB = 0x00;	// Disable TCE0 interrupts
+	}
+*/	
+}
+
+void printDigits(unsigned int backgroundColor, volatile unsigned char digits[4], unsigned int digitStartX, unsigned int digitStartY) {
+	if (digits[3] == 255) {
+		return;
+	}
+	
 	if (digits[0] == 0) {
 		if (digits[1] != 0) {
 			tft_print_image(digits[1], backgroundColor, TFT_BLACK, digitStartX, digitStartY);
 			tft_print_image(digits[2], backgroundColor, TFT_BLACK, digitStartX+DIGIT_OFFSET1, digitStartY);
+			tft_print_square(digitStartX+DIGIT_OFFSET2, digitStartY, backgroundColor, 16);
 		}
 		else {
 			tft_print_image(digits[2], backgroundColor, TFT_BLACK, digitStartX, digitStartY);
+			tft_print_square(digitStartX+DIGIT_OFFSET1, digitStartY, backgroundColor, 16);
+			tft_print_square(digitStartX+DIGIT_OFFSET2, digitStartY, backgroundColor, 16);
 		}
 	}
 	else {
@@ -149,8 +373,12 @@ void printDigits(unsigned int backgroundColor, volatile unsigned char digits[3],
 	}
 }
 
-void calculateDigits(volatile unsigned char* number, volatile unsigned char digits[3])
+void calculateDigits(volatile unsigned char* number, volatile unsigned char digits[4])
 {
+	if (*number == 255) {
+		digits[3] = 255;
+	}
+	
 	if (*number < 100) {
 		digits[0] = 0;
 		debug = *number/10;
@@ -253,18 +481,19 @@ void tft_print_image(unsigned char imageId, unsigned int backgroundColor, unsign
 		width=NUM_WIDTH;
 		height=NUM_HEIGHT;	
 	}
-	else if (imageId == HS_BACKGROUND_IMAGE_ID || imageId == SG_BACKGROUND_IMAGE_ID) {
+/*	else if (imageId == HS_BACKGROUND_IMAGE_ID || imageId == SG_BACKGROUND_IMAGE_ID) {
 		width=FULL_IMAGE_WIDTH;
 		height=FULL_IMAGE_HEIGHT;
 	}
+*/	
 	else if (imageId >= MAZE0_PATH_ID && imageId < MAZE0_IMAGE_ID) {
 		width = MAZEPATH_WIDTH;
 		height = MAZEPATH_HEIGHT;
 	}
 	else if(imageId >= MAZE0_IMAGE_ID)
 	{
-		width = MAZES_WIDTH;
-		height = MAZES_HEIGHT;
+		width = FULL_IMAGE_WIDTH;
+		height = FULL_IMAGE_HEIGHT;
 	}
 	else if (imageId == HS_SNAKE_BUTTON_IMAGE_ID || imageId == HS_MAZES_BUTTON_IMAGE_ID) {
 		width=HS_BUTTON_IMAGE_WIDTH;
@@ -276,11 +505,26 @@ void tft_print_image(unsigned char imageId, unsigned int backgroundColor, unsign
 		height = MAIN_MENU_BUTTON_HEIGHT;
 	}
 	
-	else if (imageId == SNAKE_GAME_OVER_ID) {
+	else if (imageId == SNAKE_GAME_OVER_ID || imageId == MAZE_SOLVED_IMAGE_ID) {
 		width = SNAKE_GAME_OVER_WIDTH;
 		height = SNAKE_GAME_OVER_HEIGHT;
 	}
 	
+	else if (imageId == OK_BUTTON_BC_ID) {
+		width = OK_BUTTON_BC_WIDTH;
+		height = OK_BUTTON_BC_HEIGHT;
+	}
+	
+	else if (imageId == TABLE_READY_IMAGE_ID) {
+		width = TABLE_READY_WIDTH;
+		height = TABLE_READY_HEIGHT;
+	}
+
+/*	else if (imageId == PAGING_USER_IMAGE_ID) {
+		width = PAGING_USER_WIDTH;
+		height = PAGING_USER_HEIGHT;
+	}
+*/	
 	else {
 		width = 0;
 		height = 0;
@@ -411,8 +655,8 @@ void touchSenseReset() {
 	PORTA_OUTCLR = 0x08;	// Set YD low
 	PORTA_PIN4CTRL |= 0x03;	// XR sense falling edge
 	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
-	PORTB_OUTSET = 0x80;	// Set F7 high, external pullup for XR
-	_delay_us(100);
+	PORTB_OUTSET = 0x80;	// Set B7 high, external pullup for XR
+	_delay_us(400);
 	
 	// Enable interrupt on XR change (PORTA_INT0) ----
 	PORTA_INTFLAGS = 0x01;	// Clear PORTA Int0 Int Flag
@@ -429,6 +673,7 @@ void touchSenseInit() {
 	PORTA_PIN4CTRL |= 0x02;	// XR sense falling edge
 	//PORTA_PIN2CTRL |= 0x03;	// XL sense low level
 	PORTB_OUTSET = 0x80;	// Set B7 high, external pullup for XR
+	_delay_us(400);
 	
 	
 	// Enable interrupt on XR change (PORTA_INT0) ----
@@ -472,24 +717,41 @@ ISR(PORTA_INT0_vect) {
 	yTouchCoord -= (volatile unsigned long)ADC_Y_OFFSET;
 	yTouchCoord *= (volatile unsigned long)Y_COORD_MAX;
 	yTouchCoord /= (volatile unsigned long)ADC_Y_MAX_MAG;
+
+///*	Testing tableReady, pagingUser, outOfRange	
+	if (xTouchCoord < 50) {
+		if (yTouchCoord < 20) {
+			tableReady = 1;
+			return;
+		}
+	}
+//*/
 	
 	switch (currentProgram) {
 		case MAIN_MENU_ID:
 			tft_print_square(xTouchCoord, yTouchCoord, 0xFFFF, 5);		// show where touch was
 			if ((xTouchCoord > HS_MAZES_BUTTON_STARTX) && (xTouchCoord < (HS_MAZES_BUTTON_STARTX+HS_BUTTON_IMAGE_WIDTH))) {
 				if ((yTouchCoord > HS_MAZES_BUTTON_STARTY) && (yTouchCoord < (HS_SNAKE_BUTTON_STARTY+HS_BUTTON_IMAGE_HEIGHT))) {
-					currentProgram = 1;
+					currentProgram = MAZE_GAME_ID;
 					changingProgram = 1;
 				}
 			}
 			else if ((xTouchCoord > HS_SNAKE_BUTTON_STARTX) && (xTouchCoord < (HS_SNAKE_BUTTON_STARTX+HS_BUTTON_IMAGE_WIDTH))) {
 				if ((yTouchCoord > HS_SNAKE_BUTTON_STARTY) && (yTouchCoord < (HS_SNAKE_BUTTON_STARTY+HS_BUTTON_IMAGE_HEIGHT))) {
-					currentProgram = 2;
+					currentProgram = SNAKE_GAME_ID;
 					changingProgram = 1;
 				}
 			}
 			break;
 		case MAZE_GAME_ID:
+			if (inMazeIntro) {
+				if ((xTouchCoord > OK_BUTTON_RC_STARTX) && (xTouchCoord < (OK_BUTTON_RC_STARTX+OK_BUTTON_RC_WIDTH))) {
+					if ((yTouchCoord > OK_BUTTON_RC_STARTY) && (yTouchCoord < (OK_BUTTON_RC_STARTY+OK_BUTTON_RC_HEIGHT))) {
+						inMazeIntro = 0;
+						return;
+					}
+				}
+			}
 			if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
 				if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
 					changingProgram = 1;
@@ -499,11 +761,50 @@ ISR(PORTA_INT0_vect) {
 			moveThroughMaze((volatile unsigned int)xTouchCoord, (volatile unsigned int)yTouchCoord);
 			break;
 		case SNAKE_GAME_ID:
+			if (inSnakeIntro) {
+				if ((xTouchCoord > OK_BUTTON_RC_STARTX) && (xTouchCoord < (OK_BUTTON_RC_STARTX+OK_BUTTON_RC_WIDTH))) {
+					if ((yTouchCoord > OK_BUTTON_RC_STARTY) && (yTouchCoord < (OK_BUTTON_RC_STARTY+OK_BUTTON_RC_HEIGHT))) {
+						inSnakeIntro = 0;
+						return;
+					}
+				}
+			}
+			
 			if ((xTouchCoord > MAIN_MENU_BUTTON_STARTX) && (xTouchCoord < (MAIN_MENU_BUTTON_STARTX+MAIN_MENU_BUTTON_WIDTH))) {
 				if ((yTouchCoord > MAIN_MENU_BUTTON_STARTY) && (yTouchCoord < (MAIN_MENU_BUTTON_STARTY+MAIN_MENU_BUTTON_HEIGHT))) {
 					changingProgram = 1;
 					return;
 				}
+			}
+
+			// Update Direction ///////////////////////////////////////////////////////////////
+			snakeHead->oldDir = snakeHead->dir;
+			
+			if(snakeHead->dir == UP || snakeHead->dir == DOWN) {
+				if (xTouchCoord > SNAKE_RIGHTBUTTON_BOUNDARY) snakeHead->dir = RIGHT;
+				else if (xTouchCoord < SNAKE_LEFTBUTTON_BOUNDARY) snakeHead->dir = LEFT;
+			}
+			else {
+				if (xTouchCoord > SNAKE_LEFTBUTTON_BOUNDARY && xTouchCoord < SNAKE_RIGHTBUTTON_BOUNDARY) {
+					if (yTouchCoord > SNAKE_UPDOWNBUTTON_BOUNDARY) snakeHead->dir = DOWN;
+					else snakeHead->dir = UP;
+				}
+			}
+			
+/*			if(xTouchCoord < SNAKE_LEFTBUTTON_BOUNDARY) {			// Moving Left
+				if (snakeHead->dir == UP || snakeHead->dir == DOWN) snakeHead->dir = LEFT;
+			}
+				
+			else if(xTouchCoord > SNAKE_RIGHTBUTON_BOUNDARY) {		// Moving Right
+				if (snakeHead->dir == UP || snakeHead->dir == DOWN) snakeHead->dir = RIGHT;
+			}
+							
+			else if (yTouchCoord < SNAKE_UPDOWNBUTTON_BOUNDARY) {		// Moving Up
+				if (snakeHead->dir == LEFT || snakeHead->dir == RIGHT) snakeHead->dir = UP;
+			}
+			
+			else {														// Moving Down
+				if (snakeHead->dir == LEFT || snakeHead->dir == RIGHT) snakeHead->dir = DOWN;
 			}
 		
 			snakeHead->oldDir = snakeHead->dir;
@@ -515,7 +816,40 @@ ISR(PORTA_INT0_vect) {
 				if (yTouchCoord > snakeHead->y) snakeHead->dir = DOWN;
 				else snakeHead->dir = UP;
 			}
-		
+*/		
+			//////////////////////////////////////////////////////////////////////////////////
+			break;
+		case TABLE_READY_PG_ID:
+			if ((xTouchCoord > OK_BUTTON_BC_STARTX) && (xTouchCoord < (OK_BUTTON_BC_STARTX+OK_BUTTON_BC_WIDTH))) {
+				if ((yTouchCoord > OK_BUTTON_BC_STARTY) && (yTouchCoord < (OK_BUTTON_BC_STARTY+OK_BUTTON_BC_HEIGHT))) {
+					//currentProgram = MAIN_MENU_ID;
+					//changingProgram = 1;
+					resumingProgram = 1;
+					tableReady = 0;
+					soundStop();
+					vibrate_pulsed_stop();
+				}
+			}
+			break;
+		case PAGING_USER_PG_ID:
+			if ((xTouchCoord > OK_BUTTON_BC_STARTX) && (xTouchCoord < (OK_BUTTON_BC_STARTX+OK_BUTTON_BC_WIDTH))) {
+				if ((yTouchCoord > OK_BUTTON_BC_STARTY) && (yTouchCoord < (OK_BUTTON_BC_STARTY+OK_BUTTON_BC_HEIGHT))) {
+					resumingProgram = 1;
+					pagingUser = 0;
+					soundStop();
+					vibrate_pulsed_stop();
+				}
+			}
+			break;
+		case OOR_PG_ID:
+			if ((xTouchCoord > OK_BUTTON_BC_STARTX) && (xTouchCoord < (OK_BUTTON_BC_STARTX+OK_BUTTON_BC_WIDTH))) {
+				if ((yTouchCoord > OK_BUTTON_BC_STARTY) && (yTouchCoord < (OK_BUTTON_BC_STARTY+OK_BUTTON_BC_HEIGHT))) {
+					resumingProgram = 1;
+					outOfRange = 0;
+					soundStop();
+					vibrate_pulsed_stop();
+				}
+			}
 			break;
 	}
 	debug = 3;
@@ -530,7 +864,7 @@ ISR(PORTA_INT0_vect) {
 ISR(TCC1_CCB_vect) {
 	TCC1_CTRLA = 0x00;	// Stop timer
 	TCC1_CTRLFSET = 0x08;	//Restart timer
-	if (!changingProgram) {
+	if (!changingProgram && !resumingProgram) {
 		touchSenseReset();
 	}
 	PORTA_INTFLAGS = 0x01;	// Clear PORTA Int0 Int Flag
@@ -840,6 +1174,10 @@ void COM_INIT(){
 	//Write to  CONFIG reg:mask all interrupts, Power up , CRC 1 byte, TX mode
 	//Write to  reg, 0x3A: pwr_up=1,
 	COM_WRITE(1,0x00,0x3A,0,0,0,0);
+	_delay_ms(1000);
+	COM_WRITE(1,0x00,0x38,0,0,0,0);
+	_delay_ms(1000);
+	COM_WRITE(1,0x00,0x3A,0,0,0,0);
 	//Enable RX_DR Interrupt via IRQ pin. low true if received data (C0, pin16)
 	sei();
 	PMIC_CTRL|=0x02;
@@ -847,12 +1185,20 @@ void COM_INIT(){
 	PORTC_INT0MASK=0x01;//C0 set
 	PORTC_PIN0CTRL |=0x02;//to sense falling edge(0x02)
 	//Write RX addr
-	COM_WRITE(5,0x0A,0xAA,0x12,0x13,0x14,0x15);
+	COM_WRITE(5,0x0A,0xFF,0x12,0x13,0x14,0x15);
+	COM_WRITE(5,0x0B,unitNumber,0x12,0x13,0x14,0x15);
 	//Write TX addr
 	COM_WRITE(5,0x10,0xBB,0x89,0x87,0x86,0x85);
 	//DEBUG:Setpower to low, ch17
-	//COM_WRITE(1,0x06,0x09,0,0,0,0);
-	//COM_WRITE(1,0x05,0x25,0,0,0,0);
+	COM_WRITE(1,0x06,0x26,0,0,0,0);
+	COM_WRITE(1,0x05,0x0F,0,0,0,0);
+	/////////////////////DEBUG////////////////////
+	//COM_FLUSH_RX();
+	//Reset RX_DR Pin via RX_DR bit in status
+	volatile unsigned int status = COM_STATUS();
+	volatile unsigned int temp= status | 0x40;//sets RX_DR to 1
+	COM_WRITE(1,0x07,temp,0,0,0,0);
+	////////////////////////////////////////
 }
 
 unsigned int COM_STATUS(){
@@ -961,7 +1307,7 @@ void COM_WRITE_PAYLOAD(unsigned int payload){//MUST BE IN TX MODE, 8 bit message
 }
 
 unsigned int COM_READ_PAYLOAD(){//MUST be in RX mode. Read payload from RX FIFO
-	unsigned int payload, status,temp;
+	volatile unsigned int payload, status,temp;
 	//SET CE LOW
 	PORTC_OUTCLR = 0x02;//set CE to be 0;
 	//COM_READ(0x17,temp);//DEBUG
@@ -1051,8 +1397,9 @@ void COM_RX_MODE(){//Enters RX mode, setup datapipe0
 	//COM_READ(0x17);
 	//Set payload length in RX_PW_PX register
 	COM_WRITE(1,0x11,0x01,0,0,0,0);//Enables datapipe0, sets length to 8.
-	//Only use datapipe0
-	COM_WRITE(1,0x02,0x01,0,0,0,0);
+	COM_WRITE(1,0x12,0x01,0,0,0,0);//Enables datapipe1, sets length to 8.
+	//Only use datapipe0, datapipe1
+	COM_WRITE(1,0x02,0x03,0,0,0,0);
 	//Ensure addr set properly, datapipe enabled(both done in init)
 	
 	//Set CONGIF bit PRIM_RX to 1. Set RX_IRQ enabled.
@@ -1065,6 +1412,7 @@ void COM_RX_MODE(){//Enters RX mode, setup datapipe0
 	//DEBUG
 	tempa = COM_STATUS();
 	tempa = COM_READ(0x11);
+	tempa = COM_READ(0x13);
 	tempa = COM_READ(0x12);
 	tempa = COM_READ(0x00);
 	tempa = COM_READ(0x17);
@@ -1107,27 +1455,60 @@ unsigned int GetNoteFreq(unsigned int noteID){
 	return ret;
 }
 
-void SoundPlay(){
-	unsigned int noteVal,countVal;
+void soundPlay(){
+	if (!soundOn) return;
+	
+	volatile unsigned int noteVal,countVal;
 	unsigned int temp;
+	unsigned int outputData=0,temp2;
 	/*16 bits: 
 	//7:0 determine note (e.x. decimal 81 would be encoded as 0x51
 	//11:8 determine note length, decimal 1 to 8. Length example:1 eight note is 1, 1 hole note is 8.
 	//
 	//using note length of zero will terminate sound. Using invalid note value (not between 0 and 88) will result in note being skipped.
 	*/	
-	
-
-		
+	debug = musicArray[musicArrayCount];
+	songPlaying = 1;	
 	noteVal=(unsigned int) (musicArray[musicArrayCount] & 0xFF);
 	countVal=(unsigned int)(musicArray[musicArrayCount]>>8);
 	musicArrayCount++;
-	if((countVal !=0)){//if count valid
-		if(noteVal<=88){
-			// Disable Touch Sensing ----------------------------------
-			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
-			PORTA_INTCTRL = 0x00;	// Disable PORTA Interrupts
-			//--------------------------------------------------------
+	
+	if (countVal == 0 && currentSongLoop == 1 && loopsLeft > 0) {
+		musicArrayCount = currentSongStartIndex;
+		noteVal=(unsigned int) (musicArray[musicArrayCount] & 0xFF);
+		countVal=(unsigned int)(musicArray[musicArrayCount]>>8);
+		musicArrayCount++;
+		loopsLeft--;
+	}
+	
+	if ((countVal !=0)){//if count valid
+		if(noteVal == 0) {
+			silentNote = 1;
+			/*// Set DAC to 0 ///////////////////////
+			outputData=0;
+			temp2=(0xF000 | (outputData<<2));
+			temp=(char)((temp2>>8));
+			//Start transmission
+			PORTD_OUTCLR = 0x10;//SS low
+			SPID_DATA =temp;
+			// Wait for transmission 1  to complete
+			while(!(SPID_STATUS & (1<<7)));
+			temp=(char)((temp2 & 0x00FF));
+			SPID_DATA =temp;
+			// Wait for transmission 2 to complete
+			while(!(SPID_STATUS & (1<<7)));
+			PORTD_OUTSET = 0x10;//SS high
+			*///////////////////////////////////////////
+			TCC0_INTCTRLB = 0x00;	// Disable CCA interrupt (silent note)
+			TCC0_CTRLA = 0x01;	// Start timer
+		}
+		else if(noteVal<=88){
+			if (!(currentProgram == TABLE_READY_PG_ID || currentProgram == PAGING_USER_PG_ID || currentProgram == OOR_PG_ID)) {
+				// Disable Touch Sensing ----------------------------------
+				PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+				PORTA_INTCTRL = 0x00;	// Disable PORTA Interrupts
+				//--------------------------------------------------------
+			}			
 			noteLength=countVal;
 			temp= GetNoteFreq(noteVal);
 			TCC0_CCA=temp;
@@ -1135,9 +1516,11 @@ void SoundPlay(){
 			TCC0_CTRLB=0x10;
 			TCC0_CTRLA=0x01;
 		}//end noteVal
+		
 	}//END If count valid
 	else{
-		unsigned int outputData=0,temp2;
+	soundOn = 0;
+	outputData=0;
 	temp2=(0xF000 | (outputData<<2));
 	temp=(char)((temp2>>8));
 	//Start transmission
@@ -1153,8 +1536,9 @@ void SoundPlay(){
 	
 	
 	//PORTC_OUTCLR=0x04;//DEBUG
-	musicArrayCount=0x00;
+	//musicArrayCount=0x00;
 	
+	songPlaying = 0;
 	touchSenseReset();
 	
 	}
@@ -1163,28 +1547,60 @@ void SoundPlay(){
 ISR(PORTC_INT0_vect){//If payload recieved
 	unsigned int rxData;
 	rxData = COM_READ_PAYLOAD();
-	if(rxData != 0 ){
-		if (rxData != 0xFF) {
-			*placeInLine = rxData;
-			calculateDigits(placeInLine, PILDigits);
-			PILChanged = 1;
-			//tft_print_square(200, 120, TFT_GREEN, 20);
-			makeSineWave();
-			SoundPlay();
+	//if(rxData != 0 ){
+		//if (rxData != 0xFF) {
+			//*placeInLine = rxData;
+			//calculateDigits(placeInLine, PILDigits);
+			//PILChanged = 1;
+			////tft_print_square(200, 120, TFT_GREEN, 20);
+			//makeSineWave();
+			//soundPlay();
+		//}
+	//}
+	//else{
+		//// We're being paged
+		//musicArrayCount=7;
+		//makeSineWave();
+		//soundPlay();
+	//}
+	
+	if(rxData < 0x9B) {
+		*placeInLine = rxData;
+		calculateDigits(placeInLine, PILDigits);
+		PILChanged = 1;
+		
+		if(*placeInLine == 0) {
+			tableReady = 1;
 		}
 	}
-	else{
-		// We're being paged
-		musicArrayCount=7;
-		makeSineWave();
-		SoundPlay();
+	else {
+		if (rxData == 0xFE){
+			pagingUser = 1;
+		}
+		else if (rxData == 0xFF) {
+			timeSincePing = 0;
+		}
+		else {
+			if (*placeInLine > rxData - 0x9B) {
+				debug = *placeInLine;
+				(*placeInLine)--;
+				calculateDigits(placeInLine, PILDigits);
+				PILChanged = 1;
+				debug = *placeInLine;
+			}
+		}	
 	}
+	
+	timeSincePing = 0;
+	
 	COM_FLUSH_RX();
 	
-	
+	//COM_INIT();
+	//COM_RX_MODE();
 }
 
 ISR(TCC0_CCA_vect){
+	if (!soundOn) return;
 	unsigned int outputData=0,temp2,temp, Vpp=1024;
 	outputData =  Vpp/100/2*sinArray[id1];
 	id1++;
@@ -1214,9 +1630,10 @@ ISR(TCC0_CCA_vect){
 }
 
 ISR(TCC0_OVF_vect){//ifv note done playing, stop. call back to function to determine next note info.
+	if (!soundOn) return;
 	//unsigned int temp;
 	subCount1++;
-	if(subCount1>=122*noteLength){//increment every 0.5 seconds hz(120 bpm base when prescale is 1)
+	if(subCount1>=3*noteLength){//increment every 0.5 seconds hz(120 bpm base when prescale is 1)
 		//TCC0_CTRLA=0x00;
 		subCount1=0;
 		subCount3++;
@@ -1231,9 +1648,19 @@ ISR(TCC0_OVF_vect){//ifv note done playing, stop. call back to function to deter
 		TCC0_CTRLA=0x00;//disable timer.
 		//PMIC_CTRL=0x00;//enable medium interrupts. pg.100
 		TCC0_CTRLB=0x00;
-		SoundPlay();//Swap above lines with this.
 		//TCC0_CTRLA=0x01;
+		if(silentNote == 1) {
+			TCC0_INTCTRLB = 0x02;	// Reenable CCA interrupt
+			silentNote = 0;
+		}
+		soundPlay();//Swap above lines with this.
 	}
+}
+
+void soundStop() {
+	TCC0_CTRLA=0x00;//disable timer.
+	TCC0_CTRLB=0x00;
+	soundOn = 0;
 }
 
 // ---------------------------------------------------------------------------

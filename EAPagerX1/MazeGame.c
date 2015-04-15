@@ -6,9 +6,26 @@
 #include <util/delay.h>
 
 
-void playMazeGame() {
-	// Initialize some game parameters
+void playMazeGame(void)
+{
+	inMazeIntro = 1;
+	mazeSolved = 0;
+	//MGStartX;
+	//MGStartY;
+	MGBlockSize = 8;
+	mazePrintOffsetX = MAZES_STARTX /*+ 2 */- (MGBlockSize/2);
+	mazePrintOffsetY = MAZES_STARTY /*+ 2 */- (MGBlockSize/2);
+	MGBackgroundColor = GAME_BACKGROUND_COLOR;
+	userPathColor = GAME_FOREGROUND_COLOR;
 	
+	// Print Intro Screen
+	tft_print_image(MG_INTRO_IMAGE_ID, GAME_BACKGROUND_COLOR, TFT_BLACK, 0, 0);
+	tft_print_image(OK_BUTTON_RC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_RC_STARTX, OK_BUTTON_RC_STARTY);
+	
+	changingProgram = 0;
+	touchSenseReset();
+	
+	// Initialize some game parameters
 	switch(currentMaze) {
 		case 0:
 			currentMazeImageId = MAZE0_IMAGE_ID;
@@ -32,15 +49,6 @@ void playMazeGame() {
 			break;
 	}
 	
-	mazeSolved = 0;	
-	//MGStartX;
-	//MGStartY;
-	MGBlockSize = 4;
-	mazePrintOffsetX = MAZES_STARTX + 2 - MGBlockSize;
-	mazePrintOffsetY = MAZES_STARTY + 2 - MGBlockSize;
-	MGBackgroundColor = GAME_BACKGROUND_COLOR;
-	userPathColor = GAME_FOREGROUND_COLOR;
-	
 	// Initialize tail
 	mazeTail = (volatile mazeNode*)malloc(sizeof(mazeNode));
 	mazeTail->x = MAZEPATH_BEGINX;
@@ -54,37 +62,122 @@ void playMazeGame() {
 	mazeHead->y = MAZEPATH_BEGINY;
 	mazeHead->backDir = 0;
 	mazeHead->prevMazeNode = mazeTail;
+	
+	// Wait till user is done with intro to start game
+	while (inMazeIntro) {
+		
+	}
 
 	// Print Background Stuff to Screen
 	tft_print_image(currentMazeImageId, MGBackgroundColor, TFT_BLACK, 0, 0);
-	printDigits(SGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
+	printDigits(MGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
 	tft_print_image(MAIN_MENU_BUTTON_ID, TFT_GREEN, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
 	
 	// Print User Trail to Screen
-	tft_print_square(MAZEPATH_BEGINX+mazePrintOffsetX, MAZEPATH_BEGINY+mazePrintOffsetY, userPathColor, MGBlockSize);
-	
-	changingProgram = 0;
-	touchSenseReset();
+	tft_print_square(MAZEPATH_BEGINX+mazePrintOffsetX, MAZEPATH_BEGINY+mazePrintOffsetY, userPathColor, MGBlockSize);	
 	
 	// Begin Game
-	while (!changingProgram && !mazeSolved) {
+	while (changingProgram == 0 && mazeSolved == 0) {
 		if (PILChanged) {
-			printDigits(SGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
+			printDigits(MGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
 			PILChanged = 0;
+		}
+		
+		if (tableReady) {
+			// Disable Touch Sensing
+			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+			PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+			
+			tableReadyMessage();
+		}
+		
+		if (pagingUser) {
+			// Disable Touch Sensing
+			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+			PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+			
+			pageUser();
+		}
+		
+		if (outOfRange) {
+			// Disable Touch Sensing
+			PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
+			PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
+			
+			timeSincePing = 0;
+			showOORMessage();
+		}
+		
+		if (resumingProgram) {	// Resuming from suspended state
+			currentProgram = MAZE_GAME_ID;
+			
+			// Reprint background stuff
+			tft_print_image(currentMazeImageId, MGBackgroundColor, TFT_BLACK, 0, 0);
+			printDigits(MGBackgroundColor, PILDigits, PIL_STARTX, PIL_STARTY);
+			tft_print_image(MAIN_MENU_BUTTON_ID, TFT_GREEN, TFT_BLACK, MAIN_MENU_BUTTON_STARTX, MAIN_MENU_BUTTON_STARTY);
+			
+			// Reprint user trail ////////////////////////////////////////////////////////////////////////////////////////////
+			tempMazeNode = mazeHead;
+			while (tempMazeNode != mazeTail) {
+				switch(tempMazeNode->backDir) {		// Print every square in this user trail segment
+					case UP:
+					segFixedCoord = tempMazeNode->x;	// x coord doesn't change on this segment
+					for (int i=tempMazeNode->y; i > tempMazeNode->prevMazeNode->y; i -= MGBlockSize) {
+						tft_print_square(segFixedCoord+mazePrintOffsetX, i+mazePrintOffsetY, userPathColor, MGBlockSize);
+					}
+					break;
+					case DOWN:
+					segFixedCoord = tempMazeNode->x;	// x coord doesn't change on this segment
+					for (int i=tempMazeNode->y; i < tempMazeNode->prevMazeNode->y; i += MGBlockSize) {
+						tft_print_square(segFixedCoord+mazePrintOffsetX, i+mazePrintOffsetY, userPathColor, MGBlockSize);
+					}
+					break;
+					case RIGHT:
+					segFixedCoord = tempMazeNode->y;	// y coord doesn't change on this segment
+					for (int i=tempMazeNode->x; i < tempMazeNode->prevMazeNode->x; i += MGBlockSize) {
+						tft_print_square(i+mazePrintOffsetX, segFixedCoord+mazePrintOffsetY, userPathColor, MGBlockSize);
+					}
+					break;
+					case LEFT:
+					segFixedCoord = tempMazeNode->y;	// y coord doesn't change on this segment
+					for (int i=tempMazeNode->x; i > tempMazeNode->prevMazeNode->x; i -= MGBlockSize) {
+						tft_print_square(i+mazePrintOffsetX, segFixedCoord+mazePrintOffsetY, userPathColor, MGBlockSize);
+					}
+					break;
+				}
+				tempMazeNode = tempMazeNode->prevMazeNode;	// increment to next bend/segment
+			}
+			tft_print_square(MAZEPATH_BEGINX+mazePrintOffsetX, MAZEPATH_BEGINY+mazePrintOffsetY, userPathColor, MGBlockSize);	// Print tail
+			//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			
+			resumingProgram = 0;
+			touchSenseReset();
 		}
 	}
 	
 	exitMazeGame();
 }
 
-void exitMazeGame() {
+void exitMazeGame(void)
+{
 	// Disable Touch Sensing
 	PORTA_INT0MASK = 0x00;	// Disconnect PA4 from PORTA INT0
 	PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
 	
-	// Print Win Screen and score //////////
+	if (mazeSolved) {
+		if (currentMaze == 2) currentMaze = 0;	// All mazes solved, go back to first maze
+		else currentMaze++;							// Send user to next maze next time they play
 	
-	////////////////////////////////////////
+	
+		// Print Win Screen and score //////////
+		tft_print_image(MAZE_SOLVED_IMAGE_ID, userPathColor, TFT_BLACK, MAZE_SOLVED_IMAGE_STARTX, MAZE_SOLVED_IMAGE_STARTY);
+		playSong(SUCCESS_SONG_ID,0,0);
+		////////////////////////////////////////
+		
+		for (int i=0; i < 2500; i++) {	// Give user time to see the maze solved screen
+			_delay_ms(1);
+		}
+	}
 	
 	// Free Node memory ////////////////////
 	while (mazeHead->prevMazeNode != NULL) {
@@ -94,15 +187,9 @@ void exitMazeGame() {
 	}
 	free((mazeNode*)mazeHead);		// Free last Node
 	////////////////////////////////////////
-	
-	if (mazeSolved) currentMaze++;	// Send user to next maze next time they play
+		
 	currentProgram = 0;			// Go to Main Menu
 	
-	/*	
-	for (int i=0; i < 2500; i++) {	// Give user time to see the Win screen
-		_delay_ms(1);
-	}
-	*/
 }
 
 void moveThroughMaze(volatile unsigned int xCoord, volatile unsigned int yCoord) {
@@ -173,7 +260,7 @@ void moveThroughMaze(volatile unsigned int xCoord, volatile unsigned int yCoord)
 			// Update Screen to reflect movement
 			tft_print_square(mazeHead->x+mazePrintOffsetX, mazeHead->y+mazePrintOffsetY, userPathColor, MGBlockSize);
 			
-			if (mazeHead->x == MAZEPATH_FINISHX && mazeHead->y == MAZEPATH_FINISHY) {		// Finished!
+			if (mazeHead->x == MAZEPATH_FINISHX && mazeHead->y < MAZEPATH_FINISHY) {		// Finished!
 				mazeSolved = 1;
 			}
 		}

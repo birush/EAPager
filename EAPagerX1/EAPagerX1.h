@@ -1,7 +1,24 @@
+#define BLUE1 1
+//#define HAVE_BASE 1
+
+#ifndef BLUE1
+#define ORANGE2 2
+#endif
+
 #ifndef EAPagerX1_H
 #define EAPagerX1_H
 
 #define F_CPU 32000000
+
+// Song IDs --------------------------------
+#define TRILL_SONG_ID 0
+#define WTOPENING_SONG_ID 13
+#define WTVERSE_SONG_ID 37
+#define ALERT_SONG_ID 121
+#define ATTN_SONG_ID 127
+#define GAMEOVER_SONG_ID 131
+#define SUCCESS_SONG_ID 140
+//------------------------------------------
 
 void clock_init(void);
 void tft_init(void);
@@ -27,6 +44,9 @@ void vibrate_pulsed_start(unsigned int, unsigned int, unsigned char);
 void vibrate_pulsed_stop(void);
 void printDigits(unsigned int, volatile unsigned char[3], unsigned int, unsigned int);
 void calculateDigits(volatile unsigned char*, volatile unsigned char[3]);
+void pageUser(void);
+void showOORMessage(void);
+void tableReadyMessage(void);
 
 // Frankie's Headers ----------------------------------------------------------------------------------------------------------
 void COM_WRITE(int ,unsigned int , unsigned int , unsigned int , unsigned int , unsigned int , unsigned int);
@@ -42,22 +62,25 @@ void COM_TX(unsigned int);
 //void COM_READ_LARGE(int numBytes, unsigned int regValue, unsigned int&,unsigned int&,unsigned int&,unsigned int&,unsigned int&);
 void clock_init();
 unsigned int GetNoteFreq(unsigned int);
-void SoundPlay(void);
+void soundPlay(void);
 void SPID_init(void);
 void SPIC_init(void);
 void makeSineWave(void);
 void TIMER_CONFIG(void);
+void soundStop(void);
+void playSong(unsigned int, unsigned char, unsigned char);
 // -----------------------------------------------------------------------------------
 
-volatile unsigned char currentProgram;
-volatile unsigned char changingProgram;
+volatile unsigned char currentProgram; 
 unsigned int debug, debug1;
 //volatile unsigned char highDigit, lowDigit;
 volatile unsigned char* placeInLine;
-volatile unsigned char PILChanged;
-volatile unsigned char PILDigits[3];
-volatile unsigned char SGSDigits[3];
+volatile unsigned char PILChanged, resumingProgram, changingProgram, pagingUser, outOfRange, soundOn, tableReady;
+volatile unsigned char PILDigits[4];
+volatile unsigned char SGSDigits[4];
 volatile unsigned char touchDebounceDelay;
+//volatile unsigned int tcd0_prevPER, tcd0_prevCTRLA;
+volatile unsigned char timeSincePing;
 
 #endif
 
@@ -67,7 +90,7 @@ volatile unsigned char touchDebounceDelay;
 #define EAPagerX1_Constants_H
 
 //======= IMAGE CONSTANTS ========================
-#define HS_BACKGROUND_IMAGE_ID 199
+#define HS_BACKGROUND_IMAGE_ID 240
 #define FULL_IMAGE_WIDTH 400
 #define FULL_IMAGE_HEIGHT 240
 
@@ -101,6 +124,62 @@ volatile unsigned char touchDebounceDelay;
 #define MAIN_MENU_BUTTON_STARTY 210
 ///////////////////////////////////////
 
+// Snake "Game Over" ////////////////
+#define SNAKE_GAME_OVER_ID 103
+#define SNAKE_GAME_OVER_WIDTH 296
+#define SNAKE_GAME_OVER_HEIGHT 140
+#define SNAKE_GAME_OVER_STARTX 52
+#define SNAKE_GAME_OVER_STARTY 35
+/////////////////////////////////////
+
+// Table Ready Message ///////////////
+#define TABLE_READY_IMAGE_ID 104
+#define TABLE_READY_WIDTH 400
+#define TABLE_READY_HEIGHT 50
+#define TABLE_READY_STARTX 0
+#define TABLE_READY_STARTY 95
+//////////////////////////////////////
+
+// OK Button - Bottom Centered ///////
+#define OK_BUTTON_BC_ID 105
+#define OK_BUTTON_BC_WIDTH 88
+#define OK_BUTTON_BC_HEIGHT 30
+#define OK_BUTTON_BC_STARTX 155
+#define OK_BUTTON_BC_STARTY 167
+//////////////////////////////////////
+
+// OK Button /////////////////////////
+#define OK_BUTTON_RC_ID OK_BUTTON_BC_ID
+#define OK_BUTTON_RC_WIDTH OK_BUTTON_BC_WIDTH
+#define OK_BUTTON_RC_HEIGHT OK_BUTTON_BC_HEIGHT
+#define OK_BUTTON_RC_STARTX 261
+#define OK_BUTTON_RC_STARTY 128
+//////////////////////////////////////
+
+// Paging User Message ///////////////
+#define PAGING_USER_IMAGE_ID 250
+#define PAGING_USER_WIDTH 400
+#define PAGING_USER_HEIGHT 240
+#define PAGING_USER_STARTX 0
+#define PAGING_USER_STARTY 0
+//////////////////////////////////////
+
+// Out Of Range Message ///////////////
+#define OOR_IMAGE_ID 251
+#define OOR_WIDTH 400
+#define OOR_HEIGHT 240
+#define OOR_STARTX 0
+#define OOR_STARTY 0
+//////////////////////////////////////
+
+// Maze Solved Message ///////////////
+#define MAZE_SOLVED_IMAGE_ID 108
+#define MAZE_SOLVED_IMAGE_WIDTH SNAKE_GAME_OVER_WIDTH
+#define MAZE_SOLVED_IMAGE_HEIGHT SNAKE_GAME_OVER_HEIGHT
+#define MAZE_SOLVED_IMAGE_STARTX SNAKE_GAME_OVER_STARTX
+#define MAZE_SOLVED_IMAGE_STARTY SNAKE_GAME_OVER_STARTY
+/////////////////////////////////////
+
 ///////////////////////////////////////
 #define MAZE0_IMAGE_ID 220
 #define MAZE0_PATH_ID 200
@@ -130,15 +209,23 @@ volatile unsigned char touchDebounceDelay;
 #define NUM_HEIGHT 16
 
 // Snake Game Background/////////////
-#define SG_BACKGROUND_IMAGE_ID 198
+#define SG_BACKGROUND_IMAGE_ID 241
 /////////////////////////////////////
 
-// Snake "Game Over" ////////////////
-#define SNAKE_GAME_OVER_ID 103
-#define SNAKE_GAME_OVER_WIDTH 296
-#define SNAKE_GAME_OVER_HEIGHT 140
-#define SNAKE_GAME_OVER_STARTX 52
-#define SNAKE_GAME_OVER_STARTY 35
+// Maze Intro ///////////////////////
+#define MG_INTRO_IMAGE_ID 242
+/////////////////////////////////////
+
+// Snake Intro //////////////////////
+#define SG_INTRO_IMAGE_ID 243
+#define SG_INTRO_HS_STARTX 114
+#define SG_INTRO_HS_ENDX 137
+#define SG_INTRO_HS_STARTY 143
+#define SG_INTRO_VS_STARTX 320
+#define SG_INTRO_VS_STARTY 107
+#define SG_INTRO_VS_ENDY 127
+#define SG_INTRO_S_WIDTH 3
+#define SG_INTRO_S_LENGTH 21 
 /////////////////////////////////////
 
 // Snake Score Constants ////////////
@@ -152,6 +239,9 @@ volatile unsigned char touchDebounceDelay;
 #define MAIN_MENU_ID 0
 #define MAZE_GAME_ID 1
 #define SNAKE_GAME_ID 2
+#define TABLE_READY_PG_ID 3
+#define PAGING_USER_PG_ID 4
+#define OOR_PG_ID 5
 //=================================
 
 // 16 bit Color Definitions =============
@@ -162,14 +252,26 @@ volatile unsigned char touchDebounceDelay;
 #define TFT_BLUE 0x001F
 #define TFT_ORANGE 0xFBE0
 #define TFT_CASE_BLUE 0x039F
-#define TFT_CASE_ORANGE 0xFBE0
-#define TFT_HS_BACKGROUND_COLOR TFT_ORANGE//0x33FF
+#define TFT_CASE_ORANGE 0xFB00
+
+#ifdef BLUE1
+#define TFT_HS_BACKGROUND_COLOR TFT_CASE_ORANGE//0x33FF
 #define TFT_HS_BUTTON_COLOR TFT_CASE_BLUE//0x76EA
+#define GAME_BACKGROUND_COLOR TFT_CASE_ORANGE
+#define GAME_FOREGROUND_COLOR TFT_CASE_BLUE
+#endif
+
+#ifdef ORANGE2
+#define TFT_HS_BACKGROUND_COLOR TFT_CASE_BLUE//0x33FF
+#define TFT_HS_BUTTON_COLOR TFT_CASE_ORANGE//0x76EA
 #define GAME_BACKGROUND_COLOR TFT_CASE_BLUE
-#define GAME_FOREGROUND_COLOR TFT_ORANGE;
+#define GAME_FOREGROUND_COLOR TFT_CASE_ORANGE
+#endif
+
 // ======================================
 
 // Timing Constants ---------------------------
+#define VB_TWO 62500
 #define VB_ONE 31250
 #define VB_THREE_FOURTHS 23438
 #define VB_HALF 15625
@@ -188,7 +290,7 @@ volatile unsigned char touchDebounceDelay;
 #define MAZEPATH_BEGINX 187
 #define MAZEPATH_BEGINY 177
 #define MAZEPATH_FINISHX 171
-#define MAZEPATH_FINISHY 0
+#define MAZEPATH_FINISHY 9
 #define MAZEPATH_WIDTH 360
 #define MAZEPATH_HEIGHT 178
 
@@ -226,6 +328,11 @@ void exitSnakeGame(void);
 #define SNAKE_OOB_MAX_Y 195
 //////////////////////////////
 
+#define SNAKE_LEFTBUTTON_BOUNDARY (FULL_IMAGE_WIDTH/4)
+#define SNAKE_RIGHTBUTTON_BOUNDARY ((FULL_IMAGE_WIDTH*3)/4)
+#define SNAKE_LEFTRIGHTBUTTON_BOUNDARY (FULL_IMAGE_WIDTH/2)
+#define SNAKE_UPDOWNBUTTON_BOUNDARY (FULL_IMAGE_HEIGHT/2)
+
 
 typedef struct snakeNode snakeNode;
 struct snakeNode {
@@ -261,6 +368,7 @@ unsigned int foodColor;
 unsigned int tailXOffset;
 unsigned int foodSeed;
 volatile unsigned int snakeSegEnd;
+volatile unsigned char inSnakeIntro;
 
 
 #endif //SNAKE_GAME_H_
@@ -299,11 +407,13 @@ unsigned int MGBackgroundColor;
 unsigned int userPathColor;
 volatile unsigned int mazeSegEnd;
 unsigned char currentMaze;
-unsigned char mazeSolved;
+volatile unsigned char mazeSolved;
 unsigned char currentMazeImageId;
 unsigned char currentMazePathId;
 unsigned int mazePrintOffsetX;
-unsigned int mazePrintOffsetY; 
+unsigned int mazePrintOffsetY;
+volatile unsigned int segFixedCoord; // Also used in snakeGame
+volatile unsigned char inMazeIntro;
 
  
 
