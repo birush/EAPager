@@ -5,27 +5,6 @@
  *  Author: Ben
  */ 
 
-// To simplify TFT pin toggling----
-#define TFTRES ((char)0x80)
-//#define TFTCS ((char)0x40)
-#define TFTDC ((char)0x40)
-#define TFTWR ((char)0x20)
-// -------------------------------
-
-// Touch Sensing Calibration ------------------
-#define ADC_X_OFFSET 510
-#define X_COORD_MAX 400
-#define ADC_X_MAX_MAG 3300
-//#define ADC_X_MAX_MAG (4095-ADC_X_OFFSET)
-#define ADC_Y_OFFSET 1100
-#define Y_COORD_MAX 240
-#define ADC_Y_MAX_MAG 3000
-//#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
-// --------------------------------------------
-
-#define XAXIS ((char)0)
-#define YAXIS ((char)1)
-
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <math.h>
@@ -34,6 +13,43 @@
 #include "EAimages.h"
 #include "EAPagerX1.h"
 #include <util/delay.h>
+
+// To simplify TFT pin toggling----
+#define TFTRES ((char)0x80)
+//#define TFTCS ((char)0x40)
+#define TFTDC ((char)0x40)
+#define TFTWR ((char)0x20)
+// -------------------------------
+
+// Touch Sensing Calibration ----------------------
+// Blue Pager ///////////////////////////////
+#ifdef BLUE1
+#define ADC_X_OFFSET 510
+#define X_COORD_MAX 400
+#define ADC_X_MAX_MAG 3250
+//#define ADC_X_MAX_MAG (4095-ADC_X_OFFSET)
+#define ADC_Y_OFFSET 975
+#define Y_COORD_MAX 240
+#define ADC_Y_MAX_MAG 3200
+//#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
+#endif
+/////////////////////////////////////////////
+// Orange Pager /////////////////////////////
+#ifdef ORANGE2
+#define ADC_X_OFFSET 500
+#define X_COORD_MAX 400
+#define ADC_X_MAX_MAG 3250
+//#define ADC_X_MAX_MAG (4095-ADC_X_OFFSET)
+#define ADC_Y_OFFSET 1000
+#define Y_COORD_MAX 240
+#define ADC_Y_MAX_MAG 3250
+//#define ADC_Y_MAX_MAG (4095-ADC_Y_OFFSET)
+#endif
+/////////////////////////////////////////////
+// -------------------------------------------------
+
+#define XAXIS ((char)0)
+#define YAXIS ((char)1)
 
 volatile unsigned int adcValue = 0;
 volatile unsigned int xTouch=0, yTouch=0;
@@ -73,14 +89,15 @@ unsigned long int musicArray[149]=
 {
 	/*TRILL*/0x1044,0x103C,0x103D,0x103C,0x103D,0x103C,0x103D,0x83C,0x83D,0x83C,0x83D,0,/*WT_INTRO*/0x63D,0x13D,
 	0x13D,0x63D,0x13D,0x13D,0x23D,0x23A,0x236,0x23A,0x23D,0x23A,0x23D,0x236,0x23D,0x23A,
-	0x236,0x23A,0x23D,0x23A,0x3D,0x236,0xE3D,0,/*WT_VERSE*/0x831,0x100,0x831,0x100,0x1031,0x100,
-	0x831,0x100,0x831,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1036,0x100,0x1038,0x100,0x103A,
-	0x100,0x831,0x100,0x831,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1036,0x100,0x83A,0x100,
-	0x83A,0x100,0x1038,0x100,0x1035,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1031,0x100,0x831,
-	0x100,0x831,0x100,0x1031,0x100,0x831,0x100,0x831,0x100,0x1036,0x100,0x1038,0x100,0x103A,0x100,
-	0x836,0x100,0x83A,0x100,0x283D,0x100,0x83B,0x100,0x83A,0x100,0x838,0x100,0x1036,0x100,0x103A,
-	0x100,0x1036,0x2000,0,/*ALERT*/0x844,0x845,0x846,0x847,0x848,0,/*ATTN*/0x2042,0x2046,0x2049,0,
-	/*GAMEOVER*/0x103D,0x100,0x103C,0x100,0x103B,0x100,0x403A,0x100,0,/*SUCCESS*/0x203B,0x100,0x103B,0x100,0x103B,0x100,0x4042,0x100,0
+	0x236,0x23A,0x23D,0x23A,0x3D,0x236,0xE3D,0,/*WT_VERSE*/0x83D,0x100,0x83D,0x100,0x103D,0x100,
+	0x83D,0x100,0x83D,0x100,0x103D,0x100,0x83D,0x100,0x83D,0x100,0x1042,0x100,0x1044,0x100,0x1046,
+	0x100,0x83D,0x100,0x83D,0x100,0x103D,0x100,0x83D,0x100,0x83D,0x100,0x1042,0x100,0x846,0x100,
+	0x846,0x100,0x1044,0x100,0x1041,0x100,0x103D,0x100,0x83D,0x100,0x83D,0x100,0x103D,0x100,0x83D,
+	0x100,0x83D,0x100,0x103D,0x100,0x83D,0x100,0x83D,0x100,0x1042,0x100,0x1044,0x100,0x1046,0x100,
+	0x842,0x100,0x846,0x100,0x283D,0x100,0x83B,0x100,0x846,0x100,0x844,0x100,0x1042,0x100,0x1046,
+	0x100,0x1042,0x2000,0,/*ALERT*/0x844,0x845,0x846,0x847,0x848,0,/*ATTN*/0x2042,0x2046,0x2049,0,
+	/*GAMEOVER*/0x103D,0x100,0x103C,0x100,0x103B,0x100,0x403A,0x100,0,/*SUCCESS*/0x203B,0x100,
+	0x103B,0x100,0x103B,0x100,0x4042,0x100,0
 };
 unsigned int musicArrayCount=0;//Change datatype as required
 
@@ -131,7 +148,7 @@ int main(void)
 	outOfRange = 0;
 	tableReady = 0;
 	placeInLine = (volatile unsigned char*)malloc(sizeof(volatile unsigned char*));
-	*placeInLine = 250;
+	*placeInLine = 255;
 	PILChanged = 0;
 	touchDebounceDelay = 80;
 	currentMaze = 0;
@@ -150,17 +167,13 @@ int main(void)
 	timeSincePing = 0;
 	PMIC_CTRL |= 0x01;		// Enable Low level interrupts in PMIC
 	TCD0_CTRLB = 0x10;			// Normal counting mode, Enable CCA Only
-	#ifdef HAVE_BASE
-	TCD0_INTCTRLB = 0x01;		// CCA interrupt enabled at low priority
-	#endif
+	//#ifdef HAVE_BASE
+	//TCD0_INTCTRLB = 0x01;		// CCA interrupt enabled at low priority
+	//#endif
 	TCD0_PER = VB_TWO;			// Set Top
 	TCD0_CCA = VB_TWO;			// Set CCA	
 	TCD0_CTRLA = 0x07;			// Start OOR timer
 	//////////////////////////////////////////
-	
-	//playSong(ATTN_SONG_ID,1,4);
-	//_delay_ms(5000);
-	//playSong(GAMEOVER_SONG_ID,0,1);
 
     while(1)
     {
@@ -173,13 +186,6 @@ int main(void)
 			printDigits(TFT_HS_BACKGROUND_COLOR, PILDigits, PIL_STARTX, PIL_STARTY);
 			changingProgram = 0;
 			touchSenseReset();
-			
-//			playSong(WTVERSE_SONG_ID, 0, 10);
-/*			while (songPlaying) {
-				debug1 = 3;
-			}
-			playSong(WTVERSE_SONG_ID, 0, 0);
-*/
 			
 			while (!changingProgram) {
 				if (PILChanged) {
@@ -279,6 +285,13 @@ void tableReadyMessage() {
 		_delay_ms(100);
 		tft_print_image(TABLE_READY_IMAGE_ID, GAME_FOREGROUND_COLOR, TFT_BLACK, TABLE_READY_STARTX, TABLE_READY_STARTY);
 	}
+	
+	#ifdef HAVE_BASE
+	TCD0_INTCTRLB = 0x00;		// CCA interrupt disabled
+	//TCD0_CTRLA = 0x00;			// Stop OOR timer
+	//TCD0_CTRLFSET = 0x08;		// restart OOR timer
+	timeSincePing = 0;
+	#endif
 }
 
 void pageUser() {
@@ -300,7 +313,7 @@ void showOORMessage() {
 	tft_print_image(OOR_IMAGE_ID, GAME_BACKGROUND_COLOR, TFT_BLACK, OOR_STARTX, OOR_STARTY);
 	tft_print_image(OK_BUTTON_BC_ID, TFT_GREEN, TFT_BLACK, OK_BUTTON_BC_STARTX, OK_BUTTON_BC_STARTY);
 	
-	//vibrate_pulsed_start(VB_THREE_FOURTHS, VB_EIGHTH, 20);
+	vibrate_pulsed_start(VB_THREE_FOURTHS, VB_EIGHTH, 20);
 	playSong(ALERT_SONG_ID,1, 20);
 	touchSenseReset();
 	
@@ -334,7 +347,7 @@ void playSong(unsigned int songId, unsigned char loopOn, unsigned char numLoops)
 
 ISR(TCD0_CCA_vect) {
 	timeSincePing +=2;
-	if (timeSincePing > 12) {
+	if (timeSincePing > 20) {
 		outOfRange = 1;
 	}
 
@@ -377,6 +390,9 @@ void calculateDigits(volatile unsigned char* number, volatile unsigned char digi
 {
 	if (*number == 255) {
 		digits[3] = 255;
+	}
+	else {
+		digits[3] = 0;
 	}
 	
 	if (*number < 100) {
@@ -718,14 +734,14 @@ ISR(PORTA_INT0_vect) {
 	yTouchCoord *= (volatile unsigned long)Y_COORD_MAX;
 	yTouchCoord /= (volatile unsigned long)ADC_Y_MAX_MAG;
 
-///*	Testing tableReady, pagingUser, outOfRange	
-	if (xTouchCoord < 50) {
-		if (yTouchCoord < 20) {
-			tableReady = 1;
-			return;
-		}
-	}
-//*/
+	//	Testing tableReady, pagingUser, outOfRange	
+	//	if (xTouchCoord < 50) {
+	//		if (yTouchCoord < 20) {
+	//			tableReady = 1;
+	//			return;
+	//		}
+	//	}
+
 	
 	switch (currentProgram) {
 		case MAIN_MENU_ID:
@@ -791,32 +807,31 @@ ISR(PORTA_INT0_vect) {
 				}
 			}
 			
-/*			if(xTouchCoord < SNAKE_LEFTBUTTON_BOUNDARY) {			// Moving Left
-				if (snakeHead->dir == UP || snakeHead->dir == DOWN) snakeHead->dir = LEFT;
-			}
+			//if(xTouchCoord < SNAKE_LEFTBUTTON_BOUNDARY) {			// Moving Left
+				//if (snakeHead->dir == UP || snakeHead->dir == DOWN) snakeHead->dir = LEFT;
+			//}
 				
-			else if(xTouchCoord > SNAKE_RIGHTBUTON_BOUNDARY) {		// Moving Right
-				if (snakeHead->dir == UP || snakeHead->dir == DOWN) snakeHead->dir = RIGHT;
-			}
-							
-			else if (yTouchCoord < SNAKE_UPDOWNBUTTON_BOUNDARY) {		// Moving Up
-				if (snakeHead->dir == LEFT || snakeHead->dir == RIGHT) snakeHead->dir = UP;
-			}
-			
-			else {														// Moving Down
-				if (snakeHead->dir == LEFT || snakeHead->dir == RIGHT) snakeHead->dir = DOWN;
-			}
-		
-			snakeHead->oldDir = snakeHead->dir;
-			if(snakeHead->dir == UP || snakeHead->dir == DOWN) {
-				if (xTouchCoord > snakeHead->x) snakeHead->dir = RIGHT;
-				else snakeHead->dir = LEFT;
-			}
-			else {
-				if (yTouchCoord > snakeHead->y) snakeHead->dir = DOWN;
-				else snakeHead->dir = UP;
-			}
-*/		
+			//else if(xTouchCoord > SNAKE_RIGHTBUTON_BOUNDARY) {		// Moving Right
+				//if (snakeHead->dir == UP || snakeHead->dir == DOWN) snakeHead->dir = RIGHT;
+			//}
+							//
+			//else if (yTouchCoord < SNAKE_UPDOWNBUTTON_BOUNDARY) {		// Moving Up
+				//if (snakeHead->dir == LEFT || snakeHead->dir == RIGHT) snakeHead->dir = UP;
+			//}
+			//
+			//else {														// Moving Down
+				//if (snakeHead->dir == LEFT || snakeHead->dir == RIGHT) snakeHead->dir = DOWN;
+			//}
+		//
+			//snakeHead->oldDir = snakeHead->dir;
+			//if(snakeHead->dir == UP || snakeHead->dir == DOWN) {
+				//if (xTouchCoord > snakeHead->x) snakeHead->dir = RIGHT;
+				//else snakeHead->dir = LEFT;
+			//}
+			//else {
+				//if (yTouchCoord > snakeHead->y) snakeHead->dir = DOWN;
+				//else snakeHead->dir = UP;
+			//}		
 			//////////////////////////////////////////////////////////////////////////////////
 			break;
 		case TABLE_READY_PG_ID:
@@ -1180,8 +1195,8 @@ void COM_INIT(){
 	COM_WRITE(1,0x00,0x3A,0,0,0,0);
 	//Enable RX_DR Interrupt via IRQ pin. low true if received data (C0, pin16)
 	sei();
-	PMIC_CTRL|=0x02;
-	PORTC_INTCTRL=0x02;//set as medium priority.
+	PMIC_CTRL|=0x03;
+	PORTC_INTCTRL=0x03;//set as high priority.
 	PORTC_INT0MASK=0x01;//C0 set
 	PORTC_PIN0CTRL |=0x02;//to sense falling edge(0x02)
 	//Write RX addr
@@ -1191,7 +1206,7 @@ void COM_INIT(){
 	COM_WRITE(5,0x10,0xBB,0x89,0x87,0x86,0x85);
 	//DEBUG:Setpower to low, ch17
 	COM_WRITE(1,0x06,0x26,0,0,0,0);
-	COM_WRITE(1,0x05,0x0F,0,0,0,0);
+	COM_WRITE(1,0x05,0x10,0,0,0,0);
 	/////////////////////DEBUG////////////////////
 	//COM_FLUSH_RX();
 	//Reset RX_DR Pin via RX_DR bit in status
@@ -1572,6 +1587,11 @@ ISR(PORTC_INT0_vect){//If payload recieved
 		if(*placeInLine == 0) {
 			tableReady = 1;
 		}
+		
+		#ifdef HAVE_BASE
+		TCD0_CTRLFSET = 0x08;		// restart OOR timer
+		TCD0_INTCTRLB = 0x01;		// CCA interrupt enabled at low priority
+		#endif
 	}
 	else {
 		if (rxData == 0xFE){

@@ -1,4 +1,4 @@
-#define BLUE1 1
+//#define BLUE1 1
 //#define HAVE_BASE 1
 
 #ifndef BLUE1

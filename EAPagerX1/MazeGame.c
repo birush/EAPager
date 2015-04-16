@@ -165,11 +165,11 @@ void exitMazeGame(void)
 	PORTA_INTCTRL &= 0x00;	// Disable PORTA Interrupts
 	
 	if (mazeSolved) {
-		if (currentMaze == 2) currentMaze = 0;	// All mazes solved, go back to first maze
+		if (currentMaze == 4) currentMaze = 0;	// All mazes solved, go back to first maze
 		else currentMaze++;							// Send user to next maze next time they play
 	
 	
-		// Print Win Screen and score //////////
+		// Print Win Screen //////////
 		tft_print_image(MAZE_SOLVED_IMAGE_ID, userPathColor, TFT_BLACK, MAZE_SOLVED_IMAGE_STARTX, MAZE_SOLVED_IMAGE_STARTY);
 		playSong(SUCCESS_SONG_ID,0,0);
 		////////////////////////////////////////
