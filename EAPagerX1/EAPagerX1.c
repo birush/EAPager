@@ -141,6 +141,10 @@ int main(void)
 	COM_INIT();
 	COM_RX_MODE();
 	
+	// Efficient Image Print /////////////////////////
+	savedImage altNum0struct = {2, NUM_WIDTH, NUM_HEIGHT, &altNum0[0][0]};
+	////////////////////////////////////////
+	
 	currentProgram = MAIN_MENU_ID;
 	changingProgram = 0;
 	resumingProgram = 0;
@@ -184,6 +188,8 @@ int main(void)
 			tft_print_image(HS_MAZES_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_MAZES_BUTTON_STARTX, HS_MAZES_BUTTON_STARTY);
 			tft_print_image(HS_SNAKE_BUTTON_IMAGE_ID, TFT_HS_BUTTON_COLOR, TFT_BLACK, HS_SNAKE_BUTTON_STARTX, HS_SNAKE_BUTTON_STARTY);
 			printDigits(TFT_HS_BACKGROUND_COLOR, PILDigits, PIL_STARTX, PIL_STARTY);
+			alt_tft_print_image(&altNum0struct, TFT_HS_BACKGROUND_COLOR, TFT_BLACK, 200,120);
+			
 			changingProgram = 0;
 			touchSenseReset();
 			
@@ -269,6 +275,57 @@ int main(void)
     }
 
 }
+
+// Efficient Image Print =========================================================================================================
+void alt_tft_print_image(savedImage* imageId, unsigned int backgroundColor, unsigned int foregroundColor, unsigned int xCoord, unsigned int yCoord) {
+	unsigned int startX = 2*xCoord;
+	unsigned int endX = startX+(2*imageId->width)-1;
+	unsigned int startY = 2*yCoord;
+	unsigned int endY = startY+(2*imageId->height)-1;
+	volatile unsigned char currentPixel;
+	volatile unsigned char currentByte;
+	volatile unsigned char colIndex;
+	volatile unsigned char bitIndex;
+	setWindow(startX, endX, startY, endY);
+	tft_write_command(0x2C);	//Begin RAMWR
+	for (int y=0; y<imageId->height; y++) {
+		for (int x=0; x<imageId->arrayWidth; x++) {
+			colIndex = xCoord/8;		// Create Column index
+			currentByte = imageId->data[yCoord*imageId->arrayWidth+colIndex];
+			for (int k=0; k < 8; k++) {
+				bitIndex = xCoord % 8;	// Create bitIndex
+				currentPixel = currentByte & (0x80 >> bitIndex);		// Only keep individual bit 1 if 1
+				if (currentPixel) {
+					tft_write_data16(backgroundColor);
+					tft_write_data16(backgroundColor);
+				}
+				else {
+					tft_write_data16(foregroundColor);
+					tft_write_data16(foregroundColor);
+				}
+			}
+		}
+		
+		for (int x=0; x<imageId->arrayWidth; x++) {
+			colIndex = xCoord/8;		// Create Column index
+			currentByte = imageId->data[yCoord*imageId->arrayWidth+colIndex];
+			for (int k=0; k < 8; k++) {
+				bitIndex = xCoord % 8;	// Create bitIndex
+				currentPixel = currentByte & (0x80 >> bitIndex);		// Only keep individual bit 1 if 1
+				if (currentPixel) {
+					tft_write_data16(backgroundColor);
+					tft_write_data16(backgroundColor);
+				}
+				else {
+					tft_write_data16(foregroundColor);
+					tft_write_data16(foregroundColor);
+				}
+			}
+		}
+	}
+	tft_write_command(0x00);
+}
+//=================================================================
 
 void tableReadyMessage() {
 	currentProgram = TABLE_READY_PG_ID;

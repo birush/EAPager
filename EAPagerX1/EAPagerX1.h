@@ -20,6 +20,9 @@
 #define SUCCESS_SONG_ID 140
 //------------------------------------------
 
+// Efficient Image Print ===================================================
+void alt_tft_print_image(savedImage*, unsigned int, unsigned int, unsigned int, unsigned int)
+//========================================================================
 void clock_init(void);
 void tft_init(void);
 void tft_write_command(char);

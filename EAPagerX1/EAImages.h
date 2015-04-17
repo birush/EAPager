@@ -41,6 +41,19 @@ extern const __memx unsigned char num7[16][2];
 extern const __memx unsigned char num8[16][2];
 extern const __memx unsigned char num9[16][2];
 
+// efficientImagePrint =============================================================
 
+extern const __memx unsigned char altNum0[16][2];
+//extern const __memx unsigned char* num0ptr = &num0[0][0];
+
+typedef struct savedImage savedImage;
+struct savedImage {
+	unsigned char arrayWidth;
+	unsigned char width;
+	unsigned char height;
+	const __memx unsigned char* data;
+};
+
+//==================================================================================
 
 #endif
